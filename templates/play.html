@@ -34,6 +34,8 @@
 (async function(){
 const grouped={{grouped|tojson}};
 const attemptId={{attempt_id}}, roundId={{r.id}};
+const playerName={{(me.full_name or me.username)|tojson}};
+const playerClass={{(me.class_name or '')|tojson}};
 const sport=(grouped.soccer||[]).length ? 'soccer' : ((grouped.basketball||[]).length ? 'basketball' : null);
 const games=[
   ['bee','Ong tìm mật','🐝'],
@@ -130,6 +132,7 @@ function startQuestionTimer(seconds){
     const left=Math.ceil((questionDeadline-Date.now())/1000);
     el.textContent=fmt(left);
     el.closest('.question-timer')?.classList.toggle('urgent',left<=30);
+    if(games[gi]?.[0]==='soccer') window.ChemGames?.updateSoccerTimer(left);
     if(left<=0){clearInterval(timerHandle);timeoutQuestion();}
   };
   tick(); timerHandle=setInterval(tick,400);
@@ -148,7 +151,7 @@ function timeoutQuestion(){
     window.ChemGames?.outcome(g,false,{points:0,direction:beeChosenDir,blockedCount:beeBlockedDirs.size}).then(nextQuestion);
   }
 }
-function disableQuestionControls(){questionRoot.querySelectorAll('button,input,select').forEach(el=>el.disabled=true)}
+function disableQuestionControls(){questionRoot.querySelectorAll('button,input,select').forEach(el=>el.disabled=true);if(games[gi]?.[0]==='soccer')window.ChemGames?.lockSoccerAnswers()}
 function nextQuestion(){clearInterval(timerHandle);locked=false;qi++;beeChosenDir=null;render()}
 
 function render(){
@@ -204,6 +207,7 @@ function bindAnswers(q){
 }
 
 function renderBee(q,n){
+  document.querySelector('.pro-hud')?.classList.remove('soccer-hud-hidden');
   if(beeStartedAt===null)beeStartedAt=Date.now();
   window.ChemGames?.showBee({
     step:Math.min(6,Math.round((beeStep/Math.max(1,n))*6)),
@@ -221,16 +225,23 @@ function renderBee(q,n){
   const remaining=1200-Math.floor((Date.now()-beeStartedAt)/1000); startQuestionTimer(remaining);
 }
 function renderSoccer(q,n){
-  window.ChemGames?.showSoccer({question:qi+1,total:n});
-  questionRoot.innerHTML=questionCard(q,`Cú sút ${qi+1}/${n}`,mcq(q),'Trả lời đúng để ghi bàn. Mỗi câu có tối đa 2 phút.');
-  bindAnswers(q);startQuestionTimer(120);
+  document.querySelector('.pro-hud')?.classList.add('soccer-hud-hidden');
+  questionRoot.innerHTML='<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngay trên sân để thực hiện cú sút.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
+  window.ChemGames?.showSoccer({
+    question:qi+1,total:n,questionText:q.content,options:q.options||[],score,
+    timeLeft:120,playerName,className:playerClass,
+    onAnswer:(ans)=>submitAns(ans)
+  });
+  startQuestionTimer(120);
 }
 function renderBasketball(q,n){
+  document.querySelector('.pro-hud')?.classList.remove('soccer-hud-hidden');
   window.ChemGames?.showBasketball({question:qi+1,total:n});
   questionRoot.innerHTML=questionCard(q,`Lượt ném ${qi+1}/${n}`,mcq(q),'Trả lời đúng để bóng vào rổ. Mỗi câu có tối đa 2 phút.');
   bindAnswers(q);startQuestionTimer(120);
 }
 function renderRacing(q,n){
+  document.querySelector('.pro-hud')?.classList.remove('soccer-hud-hidden');
   window.ChemGames?.showRacing({question:qi+1,total:n,progress:raceProgress});
   questionRoot.innerHTML=questionCard(q,`Trạm vượt chướng ngại ${qi+1}/${n}`,tf4(q),'Đúng 1/2/3/4 ý tương ứng 5/15/25/50 điểm.');
   bindAnswers(q);startQuestionTimer(600);
@@ -245,7 +256,7 @@ async function submitAns(ans){
     const res=await fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,question_id:q.id,answer:ans})});
     if(!res.ok)throw new Error('Không thể chấm câu trả lời');
     const d=await res.json();
-    score=Number.isFinite(+d.total_score)?+d.total_score:score+(+d.score||0); scoreEl.textContent=score;
+    score=Number.isFinite(+d.total_score)?+d.total_score:score+(+d.score||0); scoreEl.textContent=score; if(g==='soccer')window.ChemGames?.updateSoccerScore(score);
     detail.push({q:q.id,score:d.score,ok:d.ok,game:g,duplicate:!!d.duplicate});
     const fb=document.getElementById('feedback');
     fb.innerHTML=(d.ok?'<span class="result-badge good">CHÍNH XÁC</span>':'<span class="result-badge bad">CHƯA ĐÚNG</span>')+
@@ -269,7 +280,8 @@ async function submitAns(ans){
   }catch(err){
     locked=false;
     document.getElementById('feedback').innerHTML='<span class="result-badge bad">LỖI MẠNG</span> Không gửi được đáp án. Hãy thử lại.';
-    if(q.qtype==='short'){document.getElementById('shortSubmit').disabled=false;document.getElementById('ans').disabled=false;}
+    if(g==='soccer'){window.ChemGames?.unlockSoccerAnswers();}
+    else if(q.qtype==='short'){document.getElementById('shortSubmit').disabled=false;document.getElementById('ans').disabled=false;}
     else if(q.qtype==='mcq'){document.querySelectorAll('[data-answer]').forEach(x=>x.disabled=false);}
     else{document.querySelectorAll('[data-tf],#tfSubmit').forEach(x=>x.disabled=false);}
   }

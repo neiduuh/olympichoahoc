@@ -1,0 +1,26 @@
+OLYMPIC HÓA HỌC V4.3 - NÂNG CẤP MINI GAME SÚT BÓNG
+
+Mục tiêu: giao diện mini game bóng đá theo bố cục kiểu Violympic mà người dùng cung cấp,
+nhưng không sao chép hình/nhân vật của Violympic. Giao diện được vẽ động bằng Phaser để
+câu hỏi và đáp án của Admin vẫn thay đổi theo ngân hàng câu hỏi.
+
+Đã thay đổi:
+1. Câu hỏi hiển thị trực tiếp trong bảng lớn phía trên sân.
+2. 4 đáp án A/B/C/D hiển thị thành 4 bảng lớn ngay trong sân và có thể bấm trực tiếp.
+3. Cột trái hiển thị thí sinh, lớp, thời gian 2 phút/câu và tổng điểm hiện tại.
+4. Khung thành, lưới, sân cỏ, vườn trường và chi tiết Hóa học được vẽ bằng Phaser.
+5. Thủ môn được đổi thành mascot cú mèo phong cách hoạt hình học đường.
+6. Quả bóng nằm ở chấm sút; chọn đáp án sẽ khóa 4 lựa chọn và gửi đáp án về server.
+7. Đúng: bóng sút vào góc lưới, thủ môn đổ người sai hướng, rung lưới, confetti, +10 điểm.
+8. Sai: ngẫu nhiên thủ môn cản phá hoặc bóng đi ra ngoài.
+9. Điểm và đồng hồ trong sân được đồng bộ với logic thi hiện có.
+10. Không thay đổi Supabase, Admin, bảng xếp hạng hay dữ liệu hiện tại.
+
+Các file chính thay đổi:
+- static/js/phaser-games.js
+- templates/play.html
+- static/css/style.css
+
+Deploy:
+Upload 3 file trên (hoặc toàn bộ V4.3) lên GitHub, commit, sau đó Render tự deploy.
+Không cần sửa DATABASE_URL, SECRET_KEY, Build Command hoặc Supabase.

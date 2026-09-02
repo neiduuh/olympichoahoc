@@ -43,3 +43,11 @@ table{width:100%;border-collapse:collapse;background:#0b263c;border-radius:14px;
 @media(max-width:800px){.game-topbar{flex-direction:column}.pro-hud{width:100%;grid-template-columns:repeat(3,1fr)}.hud-chip{min-width:0}.phase-tab{font-size:.85rem}.phase-tab span:last-child{white-space:normal}.pro-options{grid-template-columns:1fr}.question-card-top{flex-direction:column}.question-timer{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left}.question-timer span{display:inline}.short-answer-row{flex-direction:column}.pro-tf-item{grid-template-columns:1fr}.tf-choice{width:100%}.tf-choice button{flex:1}.finish-stats{grid-template-columns:1fr 1fr 1fr}}
 @media(max-width:520px){.pro-hud{grid-template-columns:1fr 1fr}.danger-chip{grid-column:1/-1}.phase-tabs{grid-template-columns:1fr}.phase-tab span:last-child{white-space:nowrap}.pro-question-card{padding:15px}.pro-tf-item{padding:10px}.finish-stats{grid-template-columns:1fr}.phaser-frame{border-radius:16px}.game-title-wrap h1{font-size:1.55rem}}
 @media(prefers-reduced-motion:reduce){.game-progress>div,.pro-option{transition:none}.pro-option:hover{transform:none}}
+
+
+/* ===== V4.3 Violympic-style Soccer ===== */
+.pro-hud.soccer-hud-hidden{visibility:hidden;pointer-events:none}
+.soccer-status-strip{margin-top:10px;background:linear-gradient(180deg,#0d3955,#092a40);border:1px solid #3d718f;border-radius:13px;padding:10px 14px;color:#d9eef9;text-align:center;font-weight:700}
+.soccer-status-strip .result-badge{vertical-align:middle}
+.soccer-hidden-timer{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important;padding:0!important;margin:-1px!important}
+@media(max-width:800px){.pro-hud.soccer-hud-hidden{display:none}.soccer-status-strip{font-size:.9rem}}
