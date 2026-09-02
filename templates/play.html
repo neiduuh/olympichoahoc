@@ -30,9 +30,8 @@
   <div id="questionRoot"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-<script src="{{url_for('static',filename='js/phaser-games.js')}}"></script>
 <script>
+(async function(){
 const grouped={{grouped|tojson}};
 const attemptId={{attempt_id}}, roundId={{r.id}};
 const sport=(grouped.soccer||[]).length ? 'soccer' : ((grouped.basketball||[]).length ? 'basketball' : null);
@@ -55,11 +54,52 @@ function fmt(sec){sec=Math.max(0,Math.floor(sec));return String(Math.floor(sec/6
 function updateGlobalClock(){document.getElementById('clock').textContent=fmt((Date.now()-started)/1000)}
 setInterval(updateGlobalClock,1000); updateGlobalClock();
 
-if(!window.ChemGames || !window.Phaser){
-  document.getElementById('phaserFallback').hidden=false;
-}else{
-  window.ChemGames.ensure();
+const fallbackBox=document.getElementById('phaserFallback');
+function loadExternalScript(src){
+  return new Promise((resolve,reject)=>{
+    const tag=document.createElement('script');
+    tag.src=src; tag.async=true;
+    tag.onload=()=>resolve(src);
+    tag.onerror=()=>{tag.remove();reject(new Error('Không tải được '+src));};
+    document.head.appendChild(tag);
+  });
 }
+async function ensurePhaserLoaded(){
+  if(window.Phaser)return true;
+  const sources=[
+    "{{url_for('static',filename='vendor/phaser.min.js')}}",
+    'https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js',
+    'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js',
+    'https://unpkg.com/phaser@3.90.0/dist/phaser.min.js'
+  ];
+  for(const src of sources){
+    try{
+      await loadExternalScript(src);
+      if(window.Phaser)return true;
+    }catch(e){ console.warn('[Olympic Hóa học] Phaser source failed:',src); }
+  }
+  return false;
+}
+const phaserOK=await ensurePhaserLoaded();
+if(!phaserOK){
+  fallbackBox.hidden=false;
+  fallbackBox.innerHTML='<strong>Không tải được bộ máy đồ họa Phaser.</strong><br>Website đã thử bản cục bộ và 3 máy chủ dự phòng nhưng đều không thành công.<br><button type="button" class="btn" id="retryPhaser" style="margin-top:14px">Tải lại game</button>';
+  document.getElementById('retryPhaser')?.addEventListener('click',()=>location.reload());
+  return;
+}
+try{
+  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}");
+}catch(e){
+  fallbackBox.hidden=false;
+  fallbackBox.textContent='Đã tải Phaser nhưng không tải được mã mini game. Hãy tải lại trang.';
+  return;
+}
+if(!window.ChemGames){
+  fallbackBox.hidden=false;
+  fallbackBox.textContent='Phaser đã tải nhưng mini game không khởi tạo được. Hãy tải lại trang.';
+  return;
+}
+window.ChemGames.ensure();
 
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){
@@ -249,5 +289,6 @@ async function finish(){
   }catch(err){questionRoot.innerHTML='<div class="flash danger">Không thể lưu kết quả. Vui lòng kiểm tra mạng rồi tải lại trang.</div>';}
 }
 render();
+})();
 </script>
 {% endblock %}

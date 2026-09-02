@@ -73,3 +73,13 @@ Phaser 3.90.0 được chọn vì API ổn định và phù hợp với cấu tr
 
 ## Lưu ý về dữ liệu Render
 Phiên bản hiện vẫn dùng SQLite. SQLite phù hợp để thử nghiệm/local nhưng không nên dùng làm dữ liệu lâu dài trên Render Free. Khi đưa vào sử dụng chính thức nên chuyển sang Supabase PostgreSQL hoặc PostgreSQL khác.
+
+## V3.1 - Sửa lỗi Phaser CDN
+Nếu trình duyệt báo không tải được Phaser, phiên bản này ưu tiên dùng Phaser cục bộ.
+Trên Render, Build Command nên là:
+
+```bash
+pip install -r requirements.txt && python build_assets.py
+```
+
+`build_assets.py` sẽ tải Phaser 3.90.0 vào `static/vendor/phaser.min.js` khi deploy. Nếu file cục bộ chưa có, trang thi vẫn thử cdnjs, jsDelivr và unpkg làm nguồn dự phòng.

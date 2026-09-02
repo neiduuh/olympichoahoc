@@ -2,7 +2,7 @@ services:
   - type: web
     name: olympic-hoa-hoc
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python build_assets.py
     startCommand: gunicorn app:app
     envVars:
       - key: SECRET_KEY

@@ -1,0 +1,16 @@
+OLYMPIC HÓA HỌC – V3.1 PHASER LOAD FIX
+
+Sửa lỗi: "Không tải được bộ máy đồ họa Phaser".
+
+1. Trình duyệt ưu tiên tải Phaser từ chính website: /static/vendor/phaser.min.js.
+2. Nếu file cục bộ chưa có, tự thử lần lượt 3 CDN: cdnjs, jsDelivr, unpkg.
+3. Thêm build_assets.py để Render tải Phaser 3.90.0 vào static/vendor trong lúc build.
+4. render.yaml đã đổi Build Command thành:
+   pip install -r requirements.txt && python build_assets.py
+5. Phaser và phaser-games.js được tải theo đúng thứ tự để tránh lỗi race condition.
+6. Có nút tải lại game nếu tất cả nguồn đều thất bại.
+
+ĐỐI VỚI WEB SERVICE RENDER ĐÃ TẠO THỦ CÔNG:
+Vào Settings > Build & Deploy > Build Command và đổi thành:
+pip install -r requirements.txt && python build_assets.py
+Sau đó Manual Deploy > Deploy latest commit.
