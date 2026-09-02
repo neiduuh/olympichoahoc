@@ -1,104 +1,16 @@
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3, os, json, random, time
+import os, json, random, time
+from io import BytesIO
+from openpyxl import Workbook
+from database import db, init_db, backend_name, IS_POSTGRES
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
-DB = os.path.join(os.path.dirname(__file__), "olympic.db")
-
-def db():
-    con = sqlite3.connect(DB)
-    con.row_factory = sqlite3.Row
-    return con
-
-def init_db():
-    con = db()
-    con.executescript("""
-    CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'player',
-        approved INTEGER NOT NULL DEFAULT 0,
-        full_name TEXT,
-        dob TEXT,
-        gender TEXT,
-        class_name TEXT,
-        phone TEXT,
-        grade_group TEXT,
-        created_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS rounds(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        description TEXT,
-        grade_group TEXT,
-        opens_at TEXT,
-        closes_at TEXT,
-        active INTEGER NOT NULL DEFAULT 1
-    );
-    CREATE TABLE IF NOT EXISTS questions(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        round_id INTEGER NOT NULL,
-        game_type TEXT NOT NULL,
-        qtype TEXT NOT NULL,
-        content TEXT NOT NULL,
-        options_json TEXT,
-        correct_json TEXT NOT NULL,
-        points INTEGER NOT NULL DEFAULT 10,
-        explanation TEXT,
-        FOREIGN KEY(round_id) REFERENCES rounds(id)
-    );
-    CREATE TABLE IF NOT EXISTS attempts(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        round_id INTEGER NOT NULL,
-        score INTEGER NOT NULL DEFAULT 0,
-        elapsed_seconds INTEGER NOT NULL DEFAULT 0,
-        started_at TEXT NOT NULL,
-        finished_at TEXT,
-        violations INTEGER NOT NULL DEFAULT 0,
-        detail_json TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id),
-        FOREIGN KEY(round_id) REFERENCES rounds(id)
-    );
-    """)
-    # Migration: game thể thao được chọn cố định theo từng vòng thi.
-    cols=[row[1] for row in con.execute("PRAGMA table_info(rounds)").fetchall()]
-    if "selected_sport" not in cols:
-        con.execute("ALTER TABLE rounds ADD COLUMN selected_sport TEXT")
-    for rr in con.execute("SELECT id FROM rounds WHERE selected_sport IS NULL OR selected_sport='' ").fetchall():
-        con.execute("UPDATE rounds SET selected_sport=? WHERE id=?", (random.choice(["soccer","basketball"]), rr[0]))
-
-    # Điểm được cộng ở server để học sinh không thể tự sửa tổng điểm trên trình duyệt.
-    attempt_cols=[row[1] for row in con.execute("PRAGMA table_info(attempts)").fetchall()]
-    if "server_score" not in attempt_cols:
-        con.execute("ALTER TABLE attempts ADD COLUMN server_score INTEGER NOT NULL DEFAULT 0")
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS attempt_answers(
-        attempt_id INTEGER NOT NULL,
-        question_id INTEGER NOT NULL,
-        score INTEGER NOT NULL DEFAULT 0,
-        is_correct INTEGER NOT NULL DEFAULT 0,
-        answered_at TEXT NOT NULL,
-        PRIMARY KEY(attempt_id, question_id),
-        FOREIGN KEY(attempt_id) REFERENCES attempts(id),
-        FOREIGN KEY(question_id) REFERENCES questions(id)
-    )
-    """)
-
-    # default admin
-    admin = con.execute("SELECT id FROM users WHERE username='admin'").fetchone()
-    if not admin:
-        con.execute("""INSERT INTO users(username,password_hash,role,approved,full_name,created_at)
-                    VALUES(?,?,?,?,?,?)""",
-                    ("admin", generate_password_hash("Admin@123"), "admin", 1, "Quản trị viên", datetime.now().isoformat(timespec="seconds")))
-    con.commit()
-    con.close()
-
-init_db()
+ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_INITIAL_PASSWORD", "Admin@123")
+init_db(generate_password_hash(ADMIN_INITIAL_PASSWORD))
 
 def current_user():
     if "uid" not in session: return None
@@ -141,8 +53,11 @@ def register():
             con.execute("INSERT INTO users(username,password_hash,created_at) VALUES(?,?,?)",
                         (username, generate_password_hash(password), datetime.now().isoformat(timespec="seconds")))
             con.commit()
-        except sqlite3.IntegrityError:
-            con.close(); flash("Tên tài khoản đã tồn tại.", "danger"); return redirect(url_for("register"))
+        except Exception as exc:
+            con.rollback(); con.close()
+            # Username đã tồn tại là lỗi thường gặp nhất ở đây. Không hiển thị chi tiết DB cho người dùng.
+            flash("Tên tài khoản đã tồn tại hoặc dữ liệu không hợp lệ.", "danger")
+            return redirect(url_for("register"))
         con.close()
         flash("Đăng ký thành công. Hãy đăng nhập để hoàn thiện hồ sơ.", "success")
         return redirect(url_for("login"))
@@ -206,7 +121,7 @@ def leaderboard():
                MAX(a.finished_at) last_finished
         FROM attempts a JOIN users u ON u.id=a.user_id
         WHERE a.round_id=? AND a.finished_at IS NOT NULL
-        GROUP BY a.user_id
+        GROUP BY a.user_id,u.full_name,u.class_name
         ORDER BY best_score DESC, best_time ASC, last_finished ASC
         """,(round_id,)).fetchall()
     con.close()
@@ -251,8 +166,8 @@ def play(round_id):
     con.close()
     started=datetime.now().isoformat(timespec="seconds")
     con=db()
-    cur=con.execute("INSERT INTO attempts(user_id,round_id,started_at) VALUES(?,?,?)",(u["id"],round_id,started))
-    aid=cur.lastrowid; con.commit(); con.close()
+    cur=con.execute("INSERT INTO attempts(user_id,round_id,started_at) VALUES(?,?,?) RETURNING id",(u["id"],round_id,started))
+    aid=cur.fetchone()["id"]; con.commit(); con.close()
     return render_template("play.html", r=r, grouped=grouped, attempt_id=aid)
 
 @app.route("/api/answer", methods=["POST"])
@@ -328,6 +243,55 @@ def api_violation():
     con=db(); con.execute("UPDATE attempts SET violations=violations+1 WHERE id=? AND user_id=? AND finished_at IS NULL",(aid,u["id"])); con.commit(); con.close()
     return jsonify({"ok":True})
 
+
+@app.route("/health")
+def health():
+    try:
+        con=db(); con.execute("SELECT 1 AS ok").fetchone(); con.close()
+        return jsonify({"ok":True,"database":backend_name()})
+    except Exception:
+        return jsonify({"ok":False,"database":backend_name()}), 503
+
+
+def _backup_payload():
+    tables=["users","rounds","questions","attempts","attempt_answers"]
+    con=db(); out={"version":4,"created_at":datetime.now().isoformat(timespec="seconds"),"database":backend_name(),"tables":{}}
+    for table in tables:
+        rows=con.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
+        out["tables"][table]=[dict(r) for r in rows]
+    con.close()
+    return out
+
+@app.route("/admin/backup/json")
+def admin_backup_json():
+    admin_required()
+    payload=_backup_payload()
+    data=json.dumps(payload,ensure_ascii=False,indent=2).encode("utf-8")
+    filename="olympic_hoa_hoc_backup_"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
+    return Response(data,mimetype="application/json",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
+
+@app.route("/admin/backup/excel")
+def admin_backup_excel():
+    admin_required()
+    payload=_backup_payload()
+    wb=Workbook(); wb.remove(wb.active)
+    for table, rows in payload["tables"].items():
+        ws=wb.create_sheet(table[:31])
+        if not rows:
+            ws.append(["Không có dữ liệu"]); continue
+        headers=list(rows[0].keys()); ws.append(headers)
+        for row in rows:
+            ws.append([row.get(h) for h in headers])
+        ws.freeze_panes="A2"; ws.auto_filter.ref=ws.dimensions
+        for col in ws.columns:
+            width=min(50,max(10,max(len(str(c.value or "")) for c in col)+2))
+            ws.column_dimensions[col[0].column_letter].width=width
+    meta=wb.create_sheet("THONG_TIN",0)
+    meta.append(["Phiên bản",payload["version"]]); meta.append(["Tạo lúc",payload["created_at"]]); meta.append(["Database",payload["database"]])
+    buf=BytesIO(); wb.save(buf); buf.seek(0)
+    filename="olympic_hoa_hoc_backup_"+datetime.now().strftime("%Y%m%d_%H%M%S")+".xlsx"
+    return send_file(buf,as_attachment=True,download_name=filename,mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 # ---------------- Admin ----------------
 @app.route("/admin")
 def admin_dashboard():
@@ -336,7 +300,7 @@ def admin_dashboard():
     rounds=con.execute("""SELECT r.*,(SELECT COUNT(*) FROM questions q WHERE q.round_id=r.id) qcount
                           FROM rounds r ORDER BY r.id DESC""").fetchall()
     con.close()
-    return render_template("admin.html", pending=pending, rounds=rounds)
+    return render_template("admin.html", pending=pending, rounds=rounds, db_backend=backend_name())
 
 @app.route("/admin/user/<int:uid>", methods=["POST"])
 def admin_user(uid):

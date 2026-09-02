@@ -1,0 +1,9 @@
+OLYMPIC HÓA HỌC V4 - SUPABASE
+
+- Chuyển dữ liệu production từ SQLite sang PostgreSQL/Supabase thông qua DATABASE_URL.
+- Trên Render, nếu thiếu DATABASE_URL ứng dụng sẽ dừng và báo lỗi để tránh vô tình dùng SQLite rồi mất dữ liệu.
+- Tự tạo/migrate các bảng users, rounds, questions, attempts, attempt_answers khi khởi động.
+- Giữ nguyên Phaser V3.1 và cơ chế tải Phaser local/CDN fallback.
+- Thêm /health để Render kiểm tra cả website và kết nối database.
+- Thêm backup JSON và Excel trong Admin.
+- SQLite chỉ còn là chế độ local khi chạy trên máy cá nhân không có DATABASE_URL.

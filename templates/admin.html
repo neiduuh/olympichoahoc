@@ -1,5 +1,6 @@
 
 {% extends "base.html" %}{% block content %}<h1>Trang quản trị</h1>
+<div class="card" style="margin-bottom:18px"><h3>💾 Sao lưu dữ liệu</h3><p><span class="badge">Database: {{db_backend}}</span></p><p class="muted">Dữ liệu chính nằm trên Supabase nên không mất khi Render redeploy. Thầy vẫn nên tải bản sao lưu định kỳ. File backup có thể chứa dữ liệu tài khoản, vì vậy cần lưu ở nơi riêng tư.</p><a class="btn" href="{{url_for('admin_backup_json')}}">Tải backup JSON</a> <a class="btn secondary" href="{{url_for('admin_backup_excel')}}">Tải backup Excel</a></div>
 <div class="grid"><div class="card"><h3>Tạo vòng thi</h3><form method="post" action="{{url_for('admin_round_new')}}">
 <div class="field"><label>Tên vòng</label><input name="title" required placeholder="Vòng 1 - Khởi động"></div>
 <div class="field"><label>Mô tả</label><textarea name="description"></textarea></div>
