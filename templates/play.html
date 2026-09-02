@@ -98,7 +98,7 @@ if(!phaserOK){
   return;
 }
 try{
-  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.8");
+  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.8.1");
 }catch(e){
   fallbackBox.hidden=false;
   fallbackBox.textContent='Đã tải Phaser nhưng không tải được mã mini game. Hãy tải lại trang.';

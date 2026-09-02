@@ -60,7 +60,7 @@
       g.fillStyle(0xf2b48b,1); g.fillCircle(34,25,15); g.lineStyle(2,0x6f3a21,1); g.strokeCircle(34,25,15);
       g.fillStyle(0xf2c338,1); g.fillRoundedRect(17,8,34,10,5); g.fillCircle(34,10,15); g.lineStyle(2,0x8b5a12,1); g.strokeCircle(34,10,15);
       g.fillStyle(0xf8fbff,1); g.fillCircle(34,9,6); g.fillStyle(0x55d2ff,1); g.fillCircle(34,9,3);
-      g.fillStyle(0x1d2630,1); g.fillCircle(29,24,2); g.fillCircle(39,24,2); g.lineStyle(2,0x8f4a33,1); g.beginPath(); g.moveTo(29,31); g.quadraticCurveTo(34,35,39,31); g.strokePath();
+      g.fillStyle(0x1d2630,1); g.fillCircle(29,24,2); g.fillCircle(39,24,2); g.lineStyle(2,0x8f4a33,1); g.beginPath(); g.moveTo(29,31); g.lineTo(34,34); g.lineTo(39,31); g.strokePath();
       g.fillStyle(0x2e86c9,1); g.fillRoundedRect(19,39,30,25,6); g.fillStyle(0xf0b138,1); g.fillRect(31,39,6,25);
       g.fillStyle(0x5f3b27,1); g.fillRect(20,61,10,8); g.fillRect(39,61,10,8);
       g.lineStyle(4,0x6f5036,1); g.beginPath(); g.moveTo(51,45); g.lineTo(61,27); g.strokePath(); g.lineStyle(3,0xb8c2c9,1); g.beginPath(); g.moveTo(54,28); g.lineTo(68,22); g.strokePath();
@@ -372,7 +372,7 @@
       g.fillStyle(0x1a232b,1); g.fillRect(-14,-3,8,28); g.fillRect(6,-3,8,28);
       // face
       g.fillStyle(0xffd574,1); g.fillCircle(25,6,18); g.lineStyle(3,0x1a232b,1); g.strokeCircle(25,6,18);
-      g.fillStyle(0x1a232b,1); g.fillCircle(20,2,3); g.fillCircle(30,2,3); g.lineStyle(2,0x1a232b,1); g.beginPath(); g.moveTo(21,13); g.quadraticCurveTo(25,16,29,13); g.strokePath();
+      g.fillStyle(0x1a232b,1); g.fillCircle(20,2,3); g.fillCircle(30,2,3); g.lineStyle(2,0x1a232b,1); g.beginPath(); g.moveTo(21,13); g.lineTo(25,16); g.lineTo(29,13); g.strokePath();
       // miner helmet
       g.fillStyle(0xf8c72d,1); g.fillRoundedRect(5,-20,42,16,7); g.fillCircle(26,-22,18); g.lineStyle(3,0x935f12,1); g.strokeRoundedRect(5,-20,42,16,7); g.strokeCircle(26,-22,18);
       g.fillStyle(0xf4f7ff,1); g.fillCircle(26,-22,8); g.lineStyle(2,0xa5b4c2,1); g.strokeCircle(26,-22,8); g.fillStyle(0x6ad6ff,1); g.fillCircle(26,-22,4);
