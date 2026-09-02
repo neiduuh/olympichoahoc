@@ -27,6 +27,9 @@
     preload(){
       const assets=window.CHEM_ASSETS||window.ChemAssets||{};
       if(assets.basketballScene && !this.textures.exists('basketScene')) this.load.image('basketScene', assets.basketballScene);
+      if(assets.raceRockScene && !this.textures.exists('raceRockScene')) this.load.image('raceRockScene', assets.raceRockScene);
+      if(assets.racePuddleScene && !this.textures.exists('racePuddleScene')) this.load.image('racePuddleScene', assets.racePuddleScene);
+      if(assets.raceBushScene && !this.textures.exists('raceBushScene')) this.load.image('raceBushScene', assets.raceBushScene);
     }
     create(){
       this.cameras.main.setBackgroundColor('#071a28');
@@ -627,31 +630,121 @@
       this.tweens.add({targets:[box,t],alpha:1,scale:1,duration:220,ease:'Back.out',hold:420,yoyo:true,onComplete:()=>{box.destroy();t.destroy();}});
     }
     showRacing(o={}){
-
-      this.clearScene();this.mode='racing';this.addSky(0x75cff4,0xc5efff);this.drawHills();this.addHeader('LÁI XE VƯỢT CHƯỚNG NGẠI','4 ý Đúng/Sai • Tối đa 50 điểm/câu • 10 phút/câu',C.cyan);
-      // trees
-      const scenery=this.add.graphics();for(let i=0;i<12;i++){const x=35+i*84,y=300+(i%3)*16;scenery.fillStyle(0x81522f,1);scenery.fillRect(x-4,y,8,38);scenery.fillStyle(0x2c8b49,1);scenery.fillCircle(x,y-8,24);scenery.fillCircle(x-15,y,16);scenery.fillCircle(x+15,y,16)}
-      // perspective road
-      const road=this.add.graphics();road.fillStyle(C.road,1);road.fillTriangle(210,H,750,H,590,260);road.fillTriangle(210,H,590,260,370,260);road.lineStyle(8,0xf1cc4f,1);road.beginPath();road.moveTo(210,H);road.lineTo(370,260);road.moveTo(750,H);road.lineTo(590,260);road.strokePath();
-      road.lineStyle(5,0xffffff,.8);for(let i=0;i<6;i++){const y=292+i*39,w=6+i*7;road.beginPath();road.moveTo(480-w,y);road.lineTo(480+w,y+22);road.strokePath();}
-      const progress=clamp(o.progress||0,0,100); const bx=330+(progress/100)*300, by=424-(progress/100)*80;
-      const bike=this.createBike(bx,by,.92-(progress/100)*.12);this.refs.bike=bike;this.refs.raceStart={x:bx,y:by};this.refs.progress=progress;
-      // obstacle ahead
-      const obsX=570+(progress*.8),obsY=360-(progress*.25);this.createBarrier(clamp(obsX,560,720),clamp(obsY,305,365));
-      // finish
-      this.add.rectangle(620,278,7,82,0xf5f5f5,1);this.add.rectangle(628,278,58,38,0xffffff,1).setOrigin(0,0);for(let r=0;r<4;r++)for(let c=0;c<6;c++)if((r+c)%2===0)this.add.rectangle(633+c*9,283+r*8,9,8,0x111111,1);
-      // progress meter
-      this.add.rectangle(735,35,190,28,0x061724,.82).setOrigin(0).setStrokeStyle(1,0xffffff,.16);this.add.rectangle(742,42,176*(progress/100),14,C.cyan,1).setOrigin(0);this.add.text(830,49,`${Math.round(progress)}%`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-      this.add.text(830,75,'TIẾN ĐỘ ĐẾN ĐÍCH',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#c8dce9'}).setOrigin(.5);
+      this.clearScene();
+      this.mode='racing';
+      const obstacle=o.obstacle||'rock';
+      const question=Math.max(1,o.question||1);
+      const total=Math.max(1,o.total||2);
+      const progress=clamp(o.progress||0,0,100);
+      const overlayKey=obstacle==='puddle'?'racePuddleScene':(obstacle==='bush'?'raceBushScene':'raceRockScene');
+      this.add.rectangle(W/2,H/2,W,H,0x79d5ff,1);
+      this.add.rectangle(W/2,120,W,240,0x8ddcff,1).setAlpha(.45);
+      if(this.textures.exists(overlayKey)){ this.add.image(W/2,315,overlayKey).setDisplaySize(W,320).setAlpha(.18); }
+      this.drawRaceLandscape();
+      this.addHeader('LÁI XE VƯỢT CHƯỚNG NGẠI VẬT','Mỗi vòng chọn ngẫu nhiên 2 trong 3 chướng ngại vật • Câu hỏi lấy ngẫu nhiên từ ngân hàng câu hỏi',C.cyan);
+      const stagePct=((question-1)/Math.max(1,total))*100;
+      this.add.rectangle(720,34,190,28,0x061724,.86).setOrigin(0).setStrokeStyle(1,0xffffff,.16);
+      this.add.rectangle(727,41,176*stagePct/100,14,C.cyan,1).setOrigin(0);
+      this.add.text(815,48,`CHẶNG ${question}/${total}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(815,74,'ĐÍCH SAU 2 CHƯỚNG NGẠI',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#c8dce9'}).setOrigin(.5);
+      const card=this.add.rectangle(118,52,172,72,0x082436,.82).setStrokeStyle(2,0xffffff,.12); card.setOrigin(0,0);
+      this.add.text(204,76,o.playerName||'Người chơi',{fontFamily:'Arial',fontSize:'18px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(204,101,o.className||'Mini game 3/3',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#b7d3e4'}).setOrigin(.5);
+      const roadY=404;
+      const obstacleX=690;
+      const stopX=300;
+      const startX=-110;
+      this.refs.race={question,total,progress,obstacle,roadY,obstacleX,stopX,startX};
+      const car=this.createRaceCar(o.stopped?stopX:startX,roadY,1);
+      const obs=this.createRaceObstacle(obstacle,obstacleX,roadY+22);
+      this.refs.raceCar=car;
+      this.refs.raceObstacle=obs;
+      this.refs.raceCar.x = o.stopped?stopX:startX;
+      this.add.text(obstacleX,roadY-84, obstacle==='rock'?'HÒN ĐÁ':(obstacle==='puddle'?'VŨNG NƯỚC':'BỤI CÂY'), {...labelStyle(16,'#ffffff'),strokeThickness:2}).setOrigin(.5);
+      this.add.rectangle(W/2,H-28,760,30,0x082436,.84).setStrokeStyle(1,0xffffff,.14);
+      this.add.text(W/2,H-28,o.stopped?'Xe đã dừng lại. Hãy trả lời câu hỏi để vượt chướng ngại vật.':'Xe đang chạy tới chướng ngại vật...', {fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#eaf7ff'}).setOrigin(.5);
     }
-    createBike(x,y,scale=1){
-      const c=this.add.container(x,y).setScale(scale),g=this.add.graphics();g.fillStyle(0x151a1e,1);g.fillCircle(-35,20,25);g.fillCircle(38,20,25);g.fillStyle(0x8d99a2,1);g.fillCircle(-35,20,15);g.fillCircle(38,20,15);g.lineStyle(8,C.red,1);g.beginPath();g.moveTo(-35,20);g.lineTo(-5,-16);g.lineTo(26,17);g.lineTo(-17,12);g.lineTo(15,-10);g.strokePath();g.lineStyle(7,0x27313a,1);g.beginPath();g.moveTo(15,-10);g.lineTo(31,-34);g.moveTo(23,-31);g.lineTo(43,-31);g.strokePath();g.fillStyle(0x25303a,1);g.fillRoundedRect(-16,-28,35,12,5);g.fillStyle(0xf0b58b,1);g.fillCircle(-5,-63,12);g.fillStyle(0x1f70c5,1);g.fillRoundedRect(-19,-52,30,31,8);g.lineStyle(6,0x1f70c5,1);g.beginPath();g.moveTo(5,-37);g.lineTo(28,-25);g.strokePath();c.add(g);return c;
+    drawRaceLandscape(){
+      const g=this.add.graphics();
+      g.fillStyle(0x7ec05e,1); g.fillRect(0,370,W,130);
+      g.fillStyle(0x6fb154,1); g.fillRect(0,410,W,90);
+      g.fillStyle(0xbfdff1,1); g.fillRect(0,332,W,38);
+      g.fillStyle(0xcfd4da,1); g.fillRect(0,300,W,70);
+      g.fillStyle(0xe7ebef,1); g.fillRect(0,300,38,200); g.fillRect(W-38,300,38,200);
+      g.fillStyle(0xa06b2c,1); g.fillRect(0,166,W,12); g.fillStyle(0xc98b34,1); g.fillRect(0,178,W,16);
+      for(let i=0;i<8;i++){ const x=40+i*120; g.fillStyle(0xc98b34,1); g.fillRect(x,145,12,49); g.fillStyle(0x2e8e38,1); g.fillCircle(x+6,130,28); g.fillCircle(x-14,139,18); g.fillCircle(x+22,138,18); }
+      for(let i=0;i<14;i++){ const x=28+i*72; g.fillStyle(0x2f8f42,1); g.fillCircle(x,152+(i%2)*8,24); g.fillCircle(x+20,142+(i%3)*6,20); }
+      g.fillStyle(0xdfeeff,0.95); g.fillEllipse(156,118,62,34); g.fillEllipse(188,118,68,40); g.fillEllipse(220,118,58,32);
+      g.fillEllipse(798,100,72,36); g.fillEllipse(836,100,76,40); g.fillEllipse(878,102,70,34);
+      g.fillStyle(0xead766,1); g.fillCircle(820,166,38);
+      g.fillStyle(0x8fd95e,1); g.fillRect(0,370,W,16);
+      g.fillStyle(0x8fb5c7,1); g.fillRect(0,300,W,4);
+      g.fillStyle(0xb0b3b8,1); g.fillRect(0,250,W,120);
+      g.fillStyle(0xffffff,0.95);
+      for(let i=0;i<7;i++) g.fillRoundedRect(40+i*138,327,84,14,4);
     }
-    createBarrier(x,y){const c=this.add.container(x,y),g=this.add.graphics();g.fillStyle(0x574338,1);g.fillRect(-42,21,8,35);g.fillRect(34,21,8,35);g.fillStyle(0xfff4e6,1);g.fillRoundedRect(-48,-5,96,28,5);for(let i=-45;i<45;i+=24){g.fillStyle(C.orange,1);g.fillTriangle(i,-5,i+13,-5,i+1,23);}c.add(g);return c;}
-    racingOutcome(points){
-      return new Promise(resolve=>{const bike=this.refs.bike;if(!bike){resolve();return;}const add=points>=50?42:points>=25?28:points>=15?18:points>=5?10:4;const target=clamp((this.refs.progress||0)+add,0,100);const dx=(target-(this.refs.progress||0))*3.0,dy=-(target-(this.refs.progress||0))*.8;
-        if(points>0){this.tweens.add({targets:bike,x:bike.x+dx,y:bike.y+dy,duration:1000,ease:'Cubic.out',onUpdate:()=>{bike.rotation=Math.sin(this.time.now/80)*.02},onComplete:()=>{bike.rotation=0;this.popMessage(`+${points} ĐIỂM • TĂNG TỐC!`,'#e8fbff',C.cyan);this.time.delayedCall(550,resolve);}});}
-        else{this.cameras.main.shake(280,.007);this.tweens.add({targets:bike,x:'-=12',duration:95,yoyo:true,repeat:3});this.popMessage('CHƯA VƯỢT ĐƯỢC CHƯỚNG NGẠI','#ffe4e4',C.red);this.time.delayedCall(850,resolve);}
+    createRaceCar(x,y,scale=1){
+      const c=this.add.container(x,y).setScale(scale);
+      const shadow=this.add.ellipse(0,38,150,22,0x000000,.18);
+      const body=this.add.graphics();
+      body.fillStyle(0x9fc224,1); body.fillRoundedRect(-88,-8,168,52,24);
+      body.fillRoundedRect(-36,-22,72,34,16);
+      body.fillStyle(0x6a7d35,1); body.fillRoundedRect(-12,-18,46,18,10);
+      body.fillStyle(0xffffff,.28); body.fillRoundedRect(-42,0,82,10,5);
+      body.fillStyle(0xffd83d,1); body.fillCircle(67,16,8);
+      body.fillStyle(0xde4e4e,1); body.fillCircle(-80,23,6);
+      const w1=this.add.container(-48,32); const w1g=this.add.graphics(); w1g.fillStyle(0x20252a,1); w1g.fillCircle(0,0,24); w1g.fillStyle(0xdfe4ea,1); w1g.fillCircle(0,0,15); w1.add(w1g);
+      const w2=this.add.container(34,32); const w2g=this.add.graphics(); w2g.fillStyle(0x20252a,1); w2g.fillCircle(0,0,24); w2g.fillStyle(0xdfe4ea,1); w2g.fillCircle(0,0,15); w2.add(w2g);
+      const kid=this.add.container(-12,-18);
+      const head=this.add.graphics(); head.fillStyle(0xf4c39b,1); head.fillCircle(-4,0,20); head.fillStyle(0xffffff,1); head.fillCircle(-10,-2,4); head.fillCircle(2,-2,4); head.fillStyle(0x3a2618,1); head.fillCircle(-10,-2,1.6); head.fillCircle(2,-2,1.6); head.lineStyle(2,0xb55342,1); head.beginPath(); head.moveTo(-10,8); head.lineTo(-4,12); head.lineTo(4,8); head.strokePath();
+      const hair=this.add.graphics(); hair.fillStyle(0x8d4923,1); hair.fillCircle(-5,-11,15); hair.fillCircle(-17,-8,8); hair.fillCircle(7,-9,8);
+      const cap=this.add.graphics(); cap.fillStyle(0x13a7c5,1); cap.fillEllipse(-2,-18,62,28); cap.fillEllipse(18,-14,34,16);
+      const shirt=this.add.graphics(); shirt.fillStyle(0x14a2bf,1); shirt.fillRoundedRect(-24,16,42,24,10);
+      kid.add([shirt,head,hair,cap]);
+      const wheelMarker1=this.add.rectangle(0,0,4,16,0x9da6ad,1); w1.add(wheelMarker1);
+      const wheelMarker2=this.add.rectangle(0,0,4,16,0x9da6ad,1); w2.add(wheelMarker2);
+      c.add([shadow,body,w1,w2,kid]);
+      c.meta={wheels:[w1,w2],kid};
+      return c;
+    }
+    createRaceObstacle(type,x,y){
+      const c=this.add.container(x,y);
+      if(type==='puddle'){
+        const g=this.add.graphics(); g.fillStyle(0x36bdf6,.95); g.fillEllipse(0,10,176,54); g.fillEllipse(-64,24,92,30); g.fillEllipse(72,18,84,26); g.fillEllipse(-18,0,44,18); g.fillEllipse(98,4,24,14); g.fillStyle(0x7de2ff,.65); g.fillEllipse(12,6,120,20); g.fillStyle(0x36bdf6,.9); g.fillCircle(-42,-20,8); g.fillCircle(-32,-26,5); g.fillCircle(80,-14,7); c.add(g);
+      } else if(type==='bush'){
+              } else {
+        const g=this.add.graphics(); g.fillStyle(0x8f8a84,1); g.fillTriangle(-54,34,-10,-50,54,28); g.fillTriangle(-54,34,4,-38,76,32); g.fillTriangle(-28,10,12,-46,54,28); g.fillStyle(0xa7a19a,1); g.fillTriangle(-22,12,-4,-18,28,18); g.fillTriangle(14,16,34,-10,56,24); g.fillStyle(0x8f8a84,1); [[-78,36,14],[-60,44,10],[64,42,12],[90,34,11]].forEach(s=>g.fillCircle(s[0],s[1],s[2])); c.add(g);
+      }
+      if(type==='bush'){
+        const g=this.add.graphics();
+        for(let i=0;i<22;i++){ const angle=(Math.PI*2/22)*i; const px=Math.cos(angle)*(40+Math.random()*22); const py=Math.sin(angle)*(18+Math.random()*14)+10; g.fillStyle([0x4f961b,0x69b823,0x5aa220][i%3],1); g.fillEllipse(px,py,44,24); }
+        g.fillStyle(0x3f7d15,1); g.fillEllipse(0,18,130,56); c.add(g);
+      }
+      c.meta={type}; return c;
+    }
+    racingApproach(){
+      return new Promise(resolve=>{
+        const car=this.refs.raceCar, info=this.refs.race;
+        if(!car||!info){ resolve(); return; }
+        this.tweens.killTweensOf(car);
+        this.tweens.addCounter({from:0,to:1,duration:1350,ease:'Sine.inOut',onUpdate:t=>{ const v=t.getValue(); car.x=Phaser.Math.Linear(info.startX,info.stopX,v); car.y=info.roadY + Math.sin(v*Math.PI*5)*2; (car.meta?.wheels||[]).forEach(w=>{ w.rotation += 0.28; }); },onComplete:()=>{ car.x=info.stopX; car.y=info.roadY; this.popMessage('Xe đã dừng lại - câu hỏi xuất hiện!','#e8fbff',C.cyan); resolve(); }});
+      });
+    }
+    racingResult(ok){
+      return new Promise(resolve=>{
+        const car=this.refs.raceCar, obs=this.refs.raceObstacle;
+        if(!car){ resolve(); return; }
+        if(ok){
+          this.popMessage('TRẢ LỜI ĐÚNG - VƯỢT QUA CHƯỚNG NGẠI!','#effff3',C.green);
+          if(obs) this.tweens.add({targets:obs,alpha:.18,scaleX:.92,scaleY:.92,duration:220,yoyo:true,repeat:1});
+          this.tweens.addCounter({from:0,to:1,duration:1180,ease:'Cubic.in',onUpdate:t=>{ const v=t.getValue(); car.x=Phaser.Math.Linear(this.refs.race.stopX,W+130,v); car.y=this.refs.race.roadY + Math.sin(v*Math.PI*3)*2; (car.meta?.wheels||[]).forEach(w=>{ w.rotation += 0.34; }); },onComplete:()=>resolve()});
+        } else {
+          this.cameras.main.shake(280,.006);
+          this.tweens.add({targets:car,x:'-=14',duration:100,yoyo:true,repeat:3});
+          this.popMessage('TRẢ LỜI SAI - KHÔNG VƯỢT ĐƯỢC CHƯỚNG NGẠI','#ffe4e4',C.red);
+          if(obs) this.tweens.add({targets:obs,angle:6,duration:90,yoyo:true,repeat:3});
+          this.time.delayedCall(900,resolve);
+        }
       });
     }
     popMessage(text,color='#fff',accent=C.yellow){
@@ -690,8 +783,10 @@
   function lockBasketballAnswers(){withScene(s=>s.lockBasketballAnswers());}
   function unlockBasketballAnswers(){withScene(s=>s.unlockBasketballAnswers());}
   function showRacing(opts){withScene(s=>s.showRacing(opts));}
-  function outcome(type,ok,extra={}){return new Promise(resolve=>withScene(s=>{let p;if(type==='soccer')p=s.soccerOutcome(ok);else if(type==='basketball')p=s.basketballOutcome(ok);else p=s.racingOutcome(extra.points||0);Promise.resolve(p).then(resolve);}));}
+  function racingApproach(){return new Promise(resolve=>withScene(s=>Promise.resolve(s.racingApproach()).then(resolve)));}
+  function racingResult(ok,extra={}){return new Promise(resolve=>withScene(s=>Promise.resolve(s.racingResult(ok,extra)).then(resolve)));}
+  function outcome(type,ok,extra={}){return new Promise(resolve=>withScene(s=>{let p;if(type==='soccer')p=s.soccerOutcome(ok);else if(type==='basketball')p=s.basketballOutcome(ok);else p=s.racingResult(ok,extra);Promise.resolve(p).then(resolve);}));}
   function destroy(){if(game){game.destroy(true);game=null;scene=null;ready=false;}}
 
-  window.ChemGames={ready:true,ensure,showTreasure,updateTreasureTimer,updateTreasureScore,treasureMoveOpen,treasureApproach,treasureOutcome,treasureWin,showSoccer,updateSoccerTimer,updateSoccerScore,lockSoccerAnswers,unlockSoccerAnswers,showBasketball,updateBasketballTimer,updateBasketballScore,lockBasketballAnswers,unlockBasketballAnswers,showRacing,outcome,destroy};
+  window.ChemGames={ready:true,ensure,showTreasure,updateTreasureTimer,updateTreasureScore,treasureMoveOpen,treasureApproach,treasureOutcome,treasureWin,showSoccer,updateSoccerTimer,updateSoccerScore,lockSoccerAnswers,unlockSoccerAnswers,showBasketball,updateBasketballTimer,updateBasketballScore,lockBasketballAnswers,unlockBasketballAnswers,showRacing,racingApproach,racingResult,outcome,destroy};
 })();
