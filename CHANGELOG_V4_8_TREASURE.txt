@@ -1,0 +1,23 @@
+OLYMPIC HÓA HỌC V4.8 - ĐÀO KHO BÁU
+
+Thay mini game Ong tìm mật bằng Đào kho báu.
+
+Luật chơi:
+- Người chơi xuất phát ở góc dưới bên trái của bản đồ.
+- Có thể di chuyển 4 hướng qua các ô liền kề không bị đá chặn.
+- Chỉ các ô chưa khám phá nằm cạnh người chơi mới hiện dấu ?.
+- Khi bước vào ô ?, hệ thống lấy ngẫu nhiên một câu trả lời ngắn từ ngân hàng câu hỏi Admin đã nhập.
+- Trả lời đúng: ô ? được mở, người chơi đi vào ô đó và được 10 điểm.
+- Trả lời sai: ô ? biến thành đá, người chơi quay lại ô trước và không thể đi qua ô đá.
+- Có thể quay lại các ô đã mở để tìm đường khác mà không cần trả lời lại.
+- Nếu không còn đường từ vị trí hiện tại đến kho báu: thất bại và tự chuyển sang mini game tiếp theo.
+- Khi đến kho báu: hoàn thành mini game.
+- Điểm mini game được giới hạn tối đa 100 điểm, kể cả khi người chơi đi đường vòng.
+- Giữ giới hạn thời gian 20 phút cho toàn mini game.
+
+Ngân hàng câu hỏi:
+- game_type trong database vẫn giữ là "bee" để không cần migration Supabase.
+- Giao diện Admin hiển thị tên mới là "Đào kho báu".
+- Mọi câu của game này bị khóa ở 10 điểm/câu phía server.
+- Mỗi lượt thi trộn ngẫu nhiên toàn bộ câu hỏi đã nhập.
+- Khuyến nghị Admin nhập ít nhất 15-20 câu để có câu dự phòng khi người chơi trả lời sai.

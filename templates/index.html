@@ -1,7 +1,7 @@
 
 {% extends "base.html" %}{% block content %}
 <section class="hero"><div><div class="badge">TRƯỜNG PTDTNT THCS VÀ THPT VÂN CANH</div><h1>Chinh phục <b>Hóa học</b><br>qua từng thử thách</h1>
-<p>Cuộc thi trực tuyến theo vòng với các mini game tương tác: Ong tìm mật, Sút bóng vào lưới, Ném bóng vào rổ và Lái xe vượt chướng ngại vật.</p>
+<p>Cuộc thi trực tuyến theo vòng với các mini game tương tác: Đào kho báu, Sút bóng vào lưới, Ném bóng vào rổ và Lái xe vượt chướng ngại vật.</p>
 {% if me %}<a class="btn" href="{{url_for('dashboard') if me.role=='player' else url_for('admin_dashboard')}}">Vào hệ thống</a>{% else %}<a class="btn" href="{{url_for('register')}}">Tham gia ngay</a>{% endif %}
 </div><div class="chem-orb">🧪</div></section>
 <h2>Vòng thi đang mở</h2><div class="grid">{% for r in rounds %}<div class="card"><h3>{{r.title}}</h3><p class="muted">{{r.description or 'Thử thách Hóa học trực tuyến'}}</p><span class="badge">Khối {{r.grade_group}}</span></div>{% else %}<div class="card">Chưa có vòng thi đang mở.</div>{% endfor %}</div>

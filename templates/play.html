@@ -38,14 +38,21 @@ const playerName={{(me.full_name or me.username)|tojson}};
 const playerClass={{(me.class_name or '')|tojson}};
 const sport=(grouped.soccer||[]).length ? 'soccer' : ((grouped.basketball||[]).length ? 'basketball' : null);
 const games=[
-  ['bee','Ong tìm mật','🐝'],
+  ['bee','Đào kho báu','⛏️'],
   ...(sport?[[sport,sport==='soccer'?'Sút bóng vào lưới':'Ném bóng vào rổ',sport==='soccer'?'⚽':'🏀']]:[]),
   ['racing','Lái xe vượt chướng ngại vật','🏍️']
 ].filter(x=>(grouped[x[0]]||[]).length);
 
 let gi=0, qi=0, score=0, violations=0, started=Date.now(), detail=[];
 let questionDeadline=null, timerHandle=null, locked=false;
-let beeStep=0, beeBlockedDirs=new Set(), beeChosenDir=null, beeStartedAt=null, beeApproaching=false, beeQuestionVisible=false;
+const TREASURE_COLS=8, TREASURE_ROWS=7;
+const treasure={
+  position:{c:0,r:6}, goal:{c:6,r:2},
+  opened:new Set(['0,6']),
+  rocks:new Set(['2,6','1,4','3,5','4,3','5,4','0,3','6,5','2,2','7,2','7,4','3,1','5,1']),
+  initialRocks:new Set(['2,6','1,4','3,5','4,3','5,4','0,3','6,5','2,2','7,2','7,4','3,1','5,1']),
+  correct:0, gameScore:0, failedRockCount:0, pending:null, startedAt:null, ended:false, busy:false
+};
 let raceProgress=0;
 const questionRoot=document.getElementById('questionRoot');
 const scoreEl=document.getElementById('score');
@@ -91,7 +98,7 @@ if(!phaserOK){
   return;
 }
 try{
-  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.7");
+  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.8");
 }catch(e){
   fallbackBox.hidden=false;
   fallbackBox.textContent='Đã tải Phaser nhưng không tải được mã mini game. Hãy tải lại trang.';
@@ -112,11 +119,17 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 
-function totalQuestions(){return games.reduce((s,x)=>s+grouped[x[0]].length,0)}
-function doneQuestions(){return games.slice(0,gi).reduce((s,x)=>s+grouped[x[0]].length,0)+qi}
+function gameTargetUnits(g){return g==='bee'?10:(grouped[g]||[]).length}
+function totalQuestions(){return games.reduce((s,x)=>s+gameTargetUnits(x[0]),0)}
+function doneQuestions(){
+  let d=0;
+  for(let i=0;i<gi;i++)d+=gameTargetUnits(games[i][0]);
+  if(gi<games.length){const g=games[gi][0];d+=g==='bee'?Math.min(10,treasure.correct):qi;}
+  return d;
+}
 function setProgress(){
   const total=totalQuestions(),done=doneQuestions();
-  document.getElementById('prog').style.width=(total?done/total*100:100)+'%';
+  document.getElementById('prog').style.width=(total?Math.min(100,done/total*100):100)+'%';
   document.getElementById('questionStepText').textContent=`${Math.min(done+1,total)}/${total} câu`;
   document.getElementById('gameStepText').textContent=gi<games.length?`Mini game ${gi+1}/${games.length}: ${games[gi][1]}`:'Hoàn thành';
 }
@@ -136,7 +149,7 @@ function startQuestionTimer(seconds){
     }
     if(games[gi]?.[0]==='soccer') window.ChemGames?.updateSoccerTimer(left);
     if(games[gi]?.[0]==='basketball') window.ChemGames?.updateBasketballTimer(left);
-    if(games[gi]?.[0]==='bee') window.ChemGames?.updateBeeTimer(left);
+    if(games[gi]?.[0]==='bee') window.ChemGames?.updateTreasureTimer(left);
     if(left<=0){clearInterval(timerHandle);timeoutQuestion();}
   };
   tick(); timerHandle=setInterval(tick,400);
@@ -149,24 +162,26 @@ function timeoutQuestion(){
   detail.push({q:q.id,score:0,timeout:true,game:g});
   disableQuestionControls();
   if(g==='bee'){
-    qi=grouped.bee.length;
-    setTimeout(()=>render(),900);
+    endTreasure(false,'Hết 20 phút — chưa tìm được kho báu.');
   }else{
-    window.ChemGames?.outcome(g,false,{points:0,direction:beeChosenDir,blockedCount:beeBlockedDirs.size}).then(nextQuestion);
+    window.ChemGames?.outcome(g,false,{points:0}).then(nextQuestion);
   }
 }
 function disableQuestionControls(){questionRoot.querySelectorAll('button,input,select').forEach(el=>el.disabled=true);if(games[gi]?.[0]==='soccer')window.ChemGames?.lockSoccerAnswers(); if(games[gi]?.[0]==='basketball')window.ChemGames?.lockBasketballAnswers();}
-function nextQuestion(){clearInterval(timerHandle);locked=false;beeApproaching=false;beeQuestionVisible=false;qi++;beeChosenDir=null;render()}
+function nextQuestion(){clearInterval(timerHandle);locked=false;qi++;render()}
 
 function render(){
   clearInterval(timerHandle);locked=false;
   if(gi>=games.length){finish();return}
   const [g]=games[gi],arr=grouped[g];
-  if(qi>=arr.length){gi++;qi=0;beeChosenDir=null;render();return}
   setProgress();renderPhaseTabs();
+  if(g==='bee'){
+    if(treasure.ended){gi++;qi=0;render();return}
+    renderTreasure(arr);return;
+  }
+  if(qi>=arr.length){gi++;qi=0;render();return}
   const q=arr[qi];
-  if(g==='bee')renderBee(q,arr.length);
-  else if(g==='soccer')renderSoccer(q,arr.length);
+  if(g==='soccer')renderSoccer(q,arr.length);
   else if(g==='basketball')renderBasketball(q,arr.length);
   else renderRacing(q,arr.length);
 }
@@ -210,43 +225,85 @@ function bindAnswers(q){
   }
 }
 
-function renderBee(q,n){
-  document.querySelector('.pro-hud')?.classList.remove('soccer-hud-hidden');
-  if(beeStartedAt===null)beeStartedAt=Date.now();
-  beeApproaching=false;
-  beeQuestionVisible=false;
-  const remaining=1200-Math.floor((Date.now()-beeStartedAt)/1000);
-  window.ChemGames?.showBee({
-    step:Math.min(6,Math.round((beeStep/Math.max(1,n))*6)),
-    blocked:[...beeBlockedDirs], selected:null,
-    score,timeLeft:remaining,playerName,className:playerClass,
-    onDirection:async(dir)=>{
-      if(beeApproaching||beeQuestionVisible||locked)return;
-      beeApproaching=true;
-      beeChosenDir=dir;
-      window.ChemGames?.selectDirection(dir);
-      window.ChemGames?.lockBeeDirections();
-      questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>🐝 Ong đang bay tới chướng ngại vật...</b><br><span>Chỉ khi chạm chướng ngại vật, câu hỏi mới xuất hiện.</span><span id="qtime" style="display:none"></span></div>`;
-      try{
-        await (window.ChemGames?.approachBeeObstacle(dir)||Promise.resolve());
-        showBeeQuestion(q,n);
-      }catch(e){
-        beeApproaching=false;
-        window.ChemGames?.unlockBeeDirections();
-        questionRoot.innerHTML=`<div class="flash danger">Không thể di chuyển Ong. Hãy thử chọn lại hướng.</div><span id="qtime" style="display:none"></span>`;
-      }
+function treasureKey(c,r){return `${c},${r}`}
+function treasureHasPath(){
+  const start=treasure.position, goal=treasure.goal, rocks=treasure.rocks;
+  const q=[start], seen=new Set([treasureKey(start.c,start.r)]);
+  for(let head=0;head<q.length;head++){
+    const p=q[head]; if(p.c===goal.c&&p.r===goal.r)return true;
+    for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const c=p.c+dc,r=p.r+dr,k=treasureKey(c,r);
+      if(c<0||c>=TREASURE_COLS||r<0||r>=TREASURE_ROWS||rocks.has(k)||seen.has(k))continue;
+      seen.add(k);q.push({c,r});
     }
+  }
+  return false;
+}
+function treasureRemaining(){
+  if(treasure.startedAt===null)treasure.startedAt=Date.now();
+  return Math.max(0,1200-Math.floor((Date.now()-treasure.startedAt)/1000));
+}
+function treasureStateForGame(){
+  return {
+    position:{...treasure.position},goal:{...treasure.goal},
+    opened:[...treasure.opened],rocks:[...treasure.rocks],
+    correct:treasure.correct,gameScore:treasure.gameScore,
+    failedRockCount:treasure.failedRockCount,finished:treasure.ended
+  };
+}
+function renderTreasure(arr){
+  document.querySelector('.pro-hud')?.classList.remove('soccer-hud-hidden');
+  if(treasure.startedAt===null)treasure.startedAt=Date.now();
+  const remaining=treasureRemaining();
+  if(remaining<=0){endTreasure(false,'Hết 20 phút — chưa tìm được kho báu.');return;}
+  window.ChemGames?.showTreasure({
+    state:treasureStateForGame(),timeLeft:remaining,playerName,className:playerClass,
+    onMove:(target)=>handleTreasureMove(target,arr)
   });
-  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>🐝 Hãy điều khiển Ong trên bản đồ.</b><br><span>Bấm ô dấu hỏi cạnh Ong hoặc chọn ↑ ↓ ← →. Ong sẽ bay tới chướng ngại vật; lúc đó câu hỏi mới hiện ra.</span><span id="qtime" style="display:none"></span></div>`;
+  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>⛏️ Hãy tìm đường tới kho báu.</b><br><span>Bấm ô liền kề hoặc nút mũi tên. Đi vào ô <b>?</b> mới xuất hiện câu hỏi; sai thì ô đó hóa đá.</span><span id="qtime" style="display:none"></span></div>`;
   startQuestionTimer(remaining);
 }
-function showBeeQuestion(q,n){
-  beeApproaching=false;
-  beeQuestionVisible=true;
-  questionRoot.innerHTML=questionCard(q,`Chướng ngại ${qi+1}/${n}`,shortInput(),'<span id="beeHelp">Ong đã đến chướng ngại vật. Trả lời đúng để vượt qua; sai thì hướng này sẽ bị khóa.</span>');
-  bindAnswers(q);
-  document.getElementById('shortSubmit').disabled=false;
-  document.getElementById('ans')?.focus();
+async function handleTreasureMove(target,arr){
+  if(treasure.busy||treasure.ended||locked)return;
+  treasure.busy=true;
+  const k=target.key||treasureKey(target.c,target.r);
+  if(target.type==='open'){
+    await (window.ChemGames?.treasureMoveOpen(target)||Promise.resolve());
+    treasure.position={c:target.c,r:target.r};
+    treasure.busy=false;renderTreasure(arr);return;
+  }
+  if(target.type==='treasure'){
+    await (window.ChemGames?.treasureWin()||Promise.resolve());
+    treasure.position={c:target.c,r:target.r};
+    await endTreasure(true,'Đã tìm thấy kho báu!');return;
+  }
+  if(qi>=arr.length){
+    treasure.busy=false;
+    await endTreasure(false,'Đã hết câu hỏi trong ngân hàng trước khi tới kho báu. Admin nên thêm ít nhất 15–20 câu.');return;
+  }
+  treasure.pending={c:target.c,r:target.r,key:k,type:'question'};
+  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>⛏️ Đang tiến tới ô bí ẩn...</b><br><span>Câu hỏi sẽ xuất hiện khi nhân vật tới ô ?.</span><span id="qtime" style="display:none"></span></div>`;
+  await (window.ChemGames?.treasureApproach(treasure.pending)||Promise.resolve());
+  showTreasureQuestion(arr[qi],arr.length);
+}
+function showTreasureQuestion(q,n){
+  treasure.busy=false;
+  const remaining=treasureRemaining();
+  questionRoot.innerHTML=questionCard(q,`Ô bí ẩn • Câu ngẫu nhiên ${qi+1}`,shortInput(),'<span>Đúng: +10 điểm và ô ? mở đường. Sai: ô ? biến thành đá, phải tìm đường khác.</span>');
+  bindAnswers(q);document.getElementById('ans')?.focus();startQuestionTimer(remaining);
+}
+async function endTreasure(success,message){
+  if(treasure.ended)return;
+  treasure.ended=true;clearInterval(timerHandle);locked=true;
+  if(success){
+    treasure.gameScore=Math.min(100,treasure.gameScore);
+    questionRoot.innerHTML=`<section class="pro-finish-card"><div class="finish-medal">🏆</div><div class="finish-kicker">ĐÀO KHO BÁU THÀNH CÔNG</div><h2>${treasure.gameScore}/100 điểm</h2><p>${esc(message)}</p><p>Đang chuyển sang mini game tiếp theo...</p></section>`;
+  }else{
+    questionRoot.innerHTML=`<section class="pro-finish-card"><div class="finish-medal">🪨</div><div class="finish-kicker">ĐÀO KHO BÁU THẤT BẠI</div><h2>${treasure.gameScore}/100 điểm</h2><p>${esc(message)}</p><p>Đang chuyển sang mini game tiếp theo...</p></section>`;
+  }
+  setProgress();renderPhaseTabs();
+  await new Promise(r=>setTimeout(r,1500));
+  locked=false;gi++;qi=0;render();
 }
 function renderSoccer(q,n){
   document.querySelector('.pro-hud')?.classList.add('soccer-hud-hidden');
@@ -278,32 +335,45 @@ function renderRacing(q,n){
 async function submitAns(ans){
   if(locked)return;
   const g=games[gi][0],q=grouped[g][qi];
-  if(g==='bee'&&!beeChosenDir){document.getElementById('feedback').innerHTML='<span class="result-badge warn">CHỌN HƯỚNG</span> Hãy chọn hướng bay trên bản đồ trước.';return}
+  if(g==='bee'&&!treasure.pending){document.getElementById('feedback').innerHTML='<span class="result-badge warn">CHƯA TỚI Ô ?</span> Hãy di chuyển tới một ô dấu hỏi trước.';return}
   locked=true;clearInterval(timerHandle);disableQuestionControls();
   try{
     const res=await fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,question_id:q.id,answer:ans})});
     if(!res.ok)throw new Error('Không thể chấm câu trả lời');
     const d=await res.json();
-    score=Number.isFinite(+d.total_score)?+d.total_score:score+(+d.score||0); scoreEl.textContent=score; if(g==='soccer')window.ChemGames?.updateSoccerScore(score); if(g==='basketball')window.ChemGames?.updateBasketballScore(score); if(g==='bee')window.ChemGames?.updateBeeScore(score);
+    score=Number.isFinite(+d.total_score)?+d.total_score:score+(+d.score||0); scoreEl.textContent=score; if(g==='soccer')window.ChemGames?.updateSoccerScore(score); if(g==='basketball')window.ChemGames?.updateBasketballScore(score); if(g==='bee')window.ChemGames?.updateTreasureScore(treasure.correct);
     detail.push({q:q.id,score:d.score,ok:d.ok,game:g,duplicate:!!d.duplicate});
     const fb=document.getElementById('feedback');
     fb.innerHTML=(d.ok?'<span class="result-badge good">CHÍNH XÁC</span>':'<span class="result-badge bad">CHƯA ĐÚNG</span>')+
       (d.explanation?` <span>${esc(d.explanation)}</span>`:'')+(g==='racing'?` <strong>+${d.score} điểm</strong>`:'');
 
-    let blockedCount=beeBlockedDirs.size;
     if(g==='bee'){
-      if(d.ok){beeStep++;beeBlockedDirs=new Set();}
-      else if(beeChosenDir){beeBlockedDirs.add(beeChosenDir);blockedCount=beeBlockedDirs.size;}
+      const target=treasure.pending;
+      if(d.ok){
+        treasure.opened.add(target.key);
+        treasure.position={c:target.c,r:target.r};
+        treasure.correct++;
+        treasure.gameScore=Math.min(100,treasure.gameScore+(+d.score||0));
+      }else{
+        treasure.rocks.add(target.key);
+        treasure.failedRockCount++;
+      }
+      await (window.ChemGames?.treasureOutcome(d.ok,target)||Promise.resolve());
+      qi++;treasure.pending=null;treasure.busy=false;locked=false;
+      window.ChemGames?.updateTreasureScore(treasure.correct);
+      if(!d.ok && !treasureHasPath()){
+        await endTreasure(false,'Các đường còn lại đã bị đá chặn. Không còn đường tới kho báu.');return;
+      }
+      if(qi>=grouped.bee.length && !(treasure.position.c===treasure.goal.c&&treasure.position.r===treasure.goal.r)){
+        await endTreasure(false,'Đã hết câu hỏi trong ngân hàng trước khi tới kho báu.');return;
+      }
+      render();return;
     }
     if(g==='racing'){
       const add=d.score>=50?42:d.score>=25?28:d.score>=15?18:d.score>=5?10:0;
       raceProgress=Math.min(100,raceProgress+add);
     }
-    await (window.ChemGames?.outcome(g,d.ok,{direction:beeChosenDir,blockedCount,points:+d.score||0}) || Promise.resolve());
-    if(g==='bee'&&beeBlockedDirs.size>=4){
-      fb.innerHTML+=' <strong> Cả 4 hướng đã bị khóa — mini game Ong tìm mật kết thúc.</strong>';
-      qi=grouped.bee.length-1;
-    }
+    await (window.ChemGames?.outcome(g,d.ok,{points:+d.score||0}) || Promise.resolve());
     nextQuestion();
   }catch(err){
     locked=false;

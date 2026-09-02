@@ -151,8 +151,10 @@ def play(round_id):
         con.commit()
 
     # Chọn số câu đúng theo luật cuộc thi từ ngân hàng câu hỏi admin đã nhập.
+    # Đào kho báu: trộn ngẫu nhiên toàn bộ ngân hàng câu hỏi admin đã nhập.
+    # Mỗi ô ? sử dụng một câu chưa dùng trong lượt thi. Nên có >= 15 câu để có
+    # đủ câu dự phòng khi thí sinh trả lời sai và phải đổi đường.
     random.shuffle(grouped["bee"])
-    grouped["bee"]=grouped["bee"][:min(10, len(grouped["bee"]))]
     if selected_sport:
         random.shuffle(grouped[selected_sport])
         grouped[selected_sport]=grouped[selected_sport][:min(10, len(grouped[selected_sport]))]
@@ -195,7 +197,19 @@ def api_answer():
     if q["qtype"]=="short":
         acceptable=[str(x).strip().lower() for x in (correct if isinstance(correct,list) else [correct])]
         ok=str(ans).strip().lower() in acceptable
-        score=q["points"] if ok else 0
+        if q["game_type"]=="bee":
+            # Đào kho báu: mỗi câu đúng 10 điểm, nhưng tổng điểm của mini game
+            # này không vượt quá 100 điểm kể cả khi người chơi đi đường vòng.
+            prev_row=con.execute("""
+                SELECT COALESCE(SUM(aa.score),0) AS s
+                FROM attempt_answers aa
+                JOIN questions qq ON qq.id=aa.question_id
+                WHERE aa.attempt_id=? AND qq.game_type='bee'
+            """,(aid,)).fetchone()
+            prev_treasure=int(prev_row["s"] or 0)
+            score=min(10,max(0,100-prev_treasure)) if ok else 0
+        else:
+            score=q["points"] if ok else 0
     elif q["qtype"]=="mcq":
         ok=str(ans)==str(correct)
         score=q["points"] if ok else 0
@@ -356,8 +370,10 @@ def admin_questions(rid):
             if game in ("soccer","basketball"):
                 points=10
         elif qtype=="short":
-            # separate acceptable answers by |
+            # Đào kho báu dùng câu trả lời ngắn; mọi câu đúng cố định 10 điểm.
             correct=[x.strip() for x in request.form["correct_short"].split("|") if x.strip()]
+            if game=="bee":
+                points=10
         elif qtype=="tf4":
             options=[request.form.get(f"tftext{i}","").strip() for i in range(4)]
             correct=[request.form.get(f"tf{i}")=="true" for i in range(4)]
