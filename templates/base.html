@@ -4,7 +4,7 @@
 <body>
 <nav class="nav"><div class="brand">⚗️ <span>Olympic</span> Hóa học</div><div class="navlinks">
 <a href="{{url_for('index')}}">Trang chủ</a><a href="{{url_for('leaderboard')}}">Bảng xếp hạng</a>
-{% if me %}{% if me.role=='admin' %}<a href="{{url_for('admin_dashboard')}}">Admin</a>{% else %}<a href="{{url_for('dashboard')}}">Thi của tôi</a>{% endif %}<a class="btn secondary small" href="{{url_for('logout')}}">Đăng xuất</a>
+{% if me %}{% if me.role=='admin' %}<a href="{{url_for('admin_dashboard')}}">Admin</a><a href="{{url_for('admin_question_bank')}}">Ngân hàng câu hỏi</a>{% else %}<a href="{{url_for('dashboard')}}">Thi của tôi</a>{% endif %}<a class="btn secondary small" href="{{url_for('logout')}}">Đăng xuất</a>
 {% else %}<a href="{{url_for('login')}}">Đăng nhập</a><a class="btn small" href="{{url_for('register')}}">Đăng ký</a>{% endif %}
 </div></nav>
 <div class="container">{% with messages=get_flashed_messages(with_categories=true) %}{% for c,m in messages %}<div class="flash {{c}}">{{m}}</div>{% endfor %}{% endwith %}

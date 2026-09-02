@@ -641,7 +641,7 @@
       this.add.rectangle(W/2,120,W,240,0x8ddcff,1).setAlpha(.45);
       if(this.textures.exists(overlayKey)){ this.add.image(W/2,315,overlayKey).setDisplaySize(W,320).setAlpha(.18); }
       this.drawRaceLandscape();
-      this.addHeader('LÁI XE VƯỢT CHƯỚNG NGẠI VẬT','Mỗi vòng chọn ngẫu nhiên 2 trong 3 chướng ngại vật • Câu hỏi lấy ngẫu nhiên từ ngân hàng câu hỏi',C.cyan);
+      this.addHeader('LÁI XE VƯỢT CHƯỚNG NGẠI VẬT','Xe chạy tới chướng ngại vật • Dừng lại rồi mới xuất hiện câu hỏi',C.cyan);
       const stagePct=((question-1)/Math.max(1,total))*100;
       this.add.rectangle(720,34,190,28,0x061724,.86).setOrigin(0).setStrokeStyle(1,0xffffff,.16);
       this.add.rectangle(727,41,176*stagePct/100,14,C.cyan,1).setOrigin(0);

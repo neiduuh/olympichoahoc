@@ -1,0 +1,23 @@
+V5.1 - NÂNG CẤP NHẬP VÀ QUẢN LÝ CÂU HỎI
+
+1. Công thức Hóa học
+- Thêm nút x₂ (chỉ số dưới), x² (chỉ số trên), Aa (trở về ký tự thường).
+- Áp dụng cho nội dung câu hỏi, phương án, đáp án ngắn, các ý Đúng/Sai và phần giải thích.
+- Dùng ký tự Unicode nên hiển thị được trong HTML và Phaser.
+- Đáp án ngắn tự chuẩn hóa chỉ số trên/dưới khi chấm, ví dụ H₂O và H2O được xem tương đương.
+
+2. Hình ảnh câu hỏi
+- Có thể upload PNG/JPG/WEBP/GIF, tối đa 2,5 MB.
+- Ảnh được lưu trong database Supabase, không phụ thuộc filesystem của Render.
+- Có ảnh xem trước trong Admin và hiển thị cùng câu hỏi khi thi.
+
+3. Sửa câu hỏi
+- Mỗi câu có nút Sửa.
+- Có thể sửa nội dung, đáp án, mini game, giải thích, ảnh.
+
+4. Sắp xếp theo vòng
+- Thêm trang Ngân hàng câu hỏi, gom theo Vòng 1, Vòng 2... theo thứ tự tạo.
+- Trong mỗi vòng: Đào kho báu -> Game thể thao -> Lái xe, sau đó theo thứ tự câu.
+
+5. Lái xe
+- Bỏ dòng mô tả "chọn ngẫu nhiên..." trên màn hình mini game.

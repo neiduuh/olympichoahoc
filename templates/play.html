@@ -199,6 +199,7 @@ function render(){
   else renderRacing(q,arr.length);
 }
 
+function questionImageHtml(q){return q?.image_url?`<div class="question-image-wrap"><img src="${esc(q.image_url)}" alt="Hình minh họa câu hỏi"></div>`:''}
 function questionCard(q,title,body,hint=''){
   return `<section class="pro-question-card">
     <div class="question-card-top">
@@ -206,6 +207,7 @@ function questionCard(q,title,body,hint=''){
       <div class="question-timer"><span>Thời gian còn lại</span><strong id="qtime">--:--</strong></div>
     </div>
     <div class="question-text">${esc(q.content)}</div>
+    ${questionImageHtml(q)}
     ${body}
     <div id="feedback" class="pro-feedback" aria-live="polite"></div>
   </section>`;
@@ -369,7 +371,7 @@ async function endTreasure(success,message){
 }
 function renderSoccer(q,n){
   document.querySelector('.pro-hud')?.classList.add('soccer-hud-hidden');
-  questionRoot.innerHTML='<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngay trên sân để thực hiện cú sút.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
+  questionRoot.innerHTML=questionImageHtml(q)+'<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngay trên sân để thực hiện cú sút.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
   window.ChemGames?.showSoccer({
     question:qi+1,total:n,questionText:q.content,options:q.options||[],score,
     timeLeft:120,playerName,className:playerClass,
@@ -380,7 +382,7 @@ function renderSoccer(q,n){
 function renderBasketball(q,n){
   document.querySelector('.pro-hud')?.classList.add('soccer-hud-hidden');
   const shuffled=getShuffledMcq(q);
-  questionRoot.innerHTML='<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngẫu nhiên ngay trên sân để thực hiện cú ném.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
+  questionRoot.innerHTML=questionImageHtml(q)+'<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngẫu nhiên ngay trên sân để thực hiện cú ném.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
   window.ChemGames?.showBasketball({
     question:qi+1,total:n,questionText:q.content,options:shuffled.options,score,
     timeLeft:120,playerName,className:playerClass,

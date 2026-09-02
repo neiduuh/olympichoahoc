@@ -1,7 +1,7 @@
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-import os, json, random, time
+import os, json, random, time, base64
 from io import BytesIO
 from openpyxl import Workbook
 from database import db, init_db, backend_name, IS_POSTGRES
@@ -30,6 +30,66 @@ def admin_required():
 @app.context_processor
 def inject_user():
     return {"me": current_user()}
+
+ALLOWED_IMAGE_MIMES={"image/png","image/jpeg","image/webp","image/gif"}
+MAX_QUESTION_IMAGE_BYTES=2_500_000
+
+def _question_image_data(file_storage):
+    if not file_storage or not getattr(file_storage,"filename",""):
+        return None
+    mime=(file_storage.mimetype or "").lower()
+    if mime not in ALLOWED_IMAGE_MIMES:
+        raise ValueError("Ảnh câu hỏi chỉ hỗ trợ PNG, JPG/JPEG, WEBP hoặc GIF.")
+    raw=file_storage.read(MAX_QUESTION_IMAGE_BYTES+1)
+    if len(raw)>MAX_QUESTION_IMAGE_BYTES:
+        raise ValueError("Ảnh câu hỏi tối đa 2,5 MB. Hãy giảm kích thước ảnh rồi tải lại.")
+    if not raw:
+        raise ValueError("File ảnh rỗng hoặc không đọc được.")
+    return f"data:{mime};base64,"+base64.b64encode(raw).decode("ascii")
+
+CHEM_SCRIPT_NORMALIZE=str.maketrans({
+    "₀":"0","₁":"1","₂":"2","₃":"3","₄":"4","₅":"5","₆":"6","₇":"7","₈":"8","₉":"9","₊":"+","₋":"-","₌":"=","₍":"(","₎":")",
+    "⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9","⁺":"+","⁻":"-","⁼":"=","⁽":"(","⁾":")"
+})
+
+def _normalize_chem_answer(value):
+    return "".join(str(value or "").translate(CHEM_SCRIPT_NORMALIZE).strip().lower().split())
+
+def _question_form_values(r, existing_image=None):
+    game=request.form["game_type"]
+    allowed_games={"bee","racing",r["selected_sport"]}
+    if game not in allowed_games:
+        raise ValueError("Mini game không hợp lệ cho vòng này.")
+    qtype={"bee":"short","soccer":"mcq","basketball":"mcq","racing":"tf4"}[game]
+    content=request.form.get("content","").strip()
+    if not content:
+        raise ValueError("Nội dung câu hỏi không được để trống.")
+    options=[]; correct=None; points=int(request.form.get("points",10) or 10)
+    if qtype=="mcq":
+        options=[request.form.get(f"opt{i}","").strip() for i in range(4)]
+        if any(not x for x in options):
+            raise ValueError("Cần nhập đủ 4 phương án trả lời.")
+        correct=request.form.get("correct_mcq","0")
+        points=10
+    elif qtype=="short":
+        correct=[x.strip() for x in request.form.get("correct_short","").split("|") if x.strip()]
+        if not correct:
+            raise ValueError("Cần nhập ít nhất một đáp án đúng.")
+        points=10 if game=="bee" else points
+    else:
+        options=[request.form.get(f"tftext{i}","").strip() for i in range(4)]
+        if any(not x for x in options):
+            raise ValueError("Cần nhập đủ nội dung 4 ý Đúng/Sai.")
+        correct=[request.form.get(f"tf{i}")=="true" for i in range(4)]
+        points=50
+    image_data=None if request.form.get("remove_image")=="1" else existing_image
+    upload=request.files.get("question_image")
+    if upload and upload.filename:
+        image_data=_question_image_data(upload)
+    return {
+        "game":game,"qtype":qtype,"content":content,"options":options,"correct":correct,"points":points,
+        "explanation":request.form.get("explanation","").strip(),"image_data":image_data
+    }
 
 @app.route("/")
 def index():
@@ -139,6 +199,8 @@ def play(round_id):
     grouped={"bee":[],"soccer":[],"basketball":[],"racing":[]}
     for q in qrows:
         d=dict(q); d["options"]=json.loads(d["options_json"] or "[]")
+        d["image_url"]=url_for("question_image",qid=d["id"]) if d.get("image_data") else None
+        d.pop("image_data",None)
         d.pop("correct_json",None)  # never send answer to browser
         grouped.get(d["game_type"],[]).append(d)
 
@@ -172,6 +234,20 @@ def play(round_id):
     aid=cur.fetchone()["id"]; con.commit(); con.close()
     return render_template("play.html", r=r, grouped=grouped, attempt_id=aid)
 
+@app.route("/question-image/<int:qid>")
+def question_image(qid):
+    login_required()
+    con=db(); q=con.execute("SELECT image_data FROM questions WHERE id=?",(qid,)).fetchone(); con.close()
+    if not q or not q["image_data"]:
+        abort(404)
+    try:
+        header,encoded=q["image_data"].split(",",1)
+        mime=header.split(";",1)[0].replace("data:","")
+        raw=base64.b64decode(encoded)
+    except Exception:
+        abort(404)
+    return Response(raw,mimetype=mime,headers={"Cache-Control":"private, max-age=3600"})
+
 @app.route("/api/answer", methods=["POST"])
 def api_answer():
     u=login_required()
@@ -195,8 +271,8 @@ def api_answer():
     ans=data.get("answer")
     score=0; ok=False
     if q["qtype"]=="short":
-        acceptable=[str(x).strip().lower() for x in (correct if isinstance(correct,list) else [correct])]
-        ok=str(ans).strip().lower() in acceptable
+        acceptable=[_normalize_chem_answer(x) for x in (correct if isinstance(correct,list) else [correct])]
+        ok=_normalize_chem_answer(ans) in acceptable
         if q["game_type"]=="bee":
             # Đào kho báu: mỗi câu đúng 10 điểm, nhưng tổng điểm của mini game
             # này không vượt quá 100 điểm kể cả khi người chơi đi đường vòng.
@@ -295,7 +371,13 @@ def admin_backup_excel():
             ws.append(["Không có dữ liệu"]); continue
         headers=list(rows[0].keys()); ws.append(headers)
         for row in rows:
-            ws.append([row.get(h) for h in headers])
+            vals=[]
+            for h in headers:
+                v=row.get(h)
+                if h=="image_data" and v:
+                    v="[Ảnh được nhúng trong backup JSON]"
+                vals.append(v)
+            ws.append(vals)
         ws.freeze_panes="A2"; ws.auto_filter.ref=ws.dimensions
         for col in ws.columns:
             width=min(50,max(10,max(len(str(c.value or "")) for c in col)+2))
@@ -312,7 +394,7 @@ def admin_dashboard():
     admin_required(); con=db()
     pending=con.execute("SELECT * FROM users WHERE role='player' ORDER BY approved ASC,id DESC").fetchall()
     rounds=con.execute("""SELECT r.*,(SELECT COUNT(*) FROM questions q WHERE q.round_id=r.id) qcount
-                          FROM rounds r ORDER BY r.id DESC""").fetchall()
+                          FROM rounds r ORDER BY r.id ASC""").fetchall()
     con.close()
     return render_template("admin.html", pending=pending, rounds=rounds, db_backend=backend_name())
 
@@ -346,55 +428,68 @@ def admin_round_toggle(rid):
     con.commit(); con.close()
     return redirect(url_for("admin_dashboard"))
 
+@app.route("/admin/questions")
+def admin_question_bank():
+    admin_required(); con=db()
+    rounds=con.execute("SELECT * FROM rounds ORDER BY id ASC").fetchall()
+    qrows=con.execute("""SELECT q.*,r.title AS round_title,r.selected_sport FROM questions q
+                         JOIN rounds r ON r.id=q.round_id
+                         ORDER BY r.id ASC,
+                         CASE q.game_type WHEN 'bee' THEN 1 WHEN 'soccer' THEN 2 WHEN 'basketball' THEN 2 WHEN 'racing' THEN 3 ELSE 9 END,
+                         q.id ASC""").fetchall()
+    con.close()
+    grouped={r["id"]:[] for r in rounds}
+    for q in qrows: grouped.setdefault(q["round_id"],[]).append(q)
+    return render_template("question_bank.html",rounds=rounds,grouped=grouped)
+
 @app.route("/admin/questions/<int:rid>", methods=["GET","POST"])
 def admin_questions(rid):
     admin_required(); con=db()
     r=con.execute("SELECT * FROM rounds WHERE id=?",(rid,)).fetchone()
     if not r: con.close(); abort(404)
     if request.method=="POST":
-        game=request.form["game_type"]
-        allowed_games={"bee","racing",r["selected_sport"]}
-        if game not in allowed_games:
-            con.close(); abort(400)
-        # Dạng câu hỏi được khóa theo luật từng mini game, không tin giá trị sửa tay từ trình duyệt.
-        qtype={"bee":"short","soccer":"mcq","basketball":"mcq","racing":"tf4"}[game]
-        content=request.form["content"].strip()
-        if not content:
-            con.close(); abort(400)
-        options=[]
-        correct=None
-        points=int(request.form.get("points",10))
-        if qtype=="mcq":
-            options=[request.form.get(f"opt{i}","").strip() for i in range(4)]
-            correct=request.form["correct_mcq"]
-            if game in ("soccer","basketball"):
-                points=10
-        elif qtype=="short":
-            # Đào kho báu dùng câu trả lời ngắn; mọi câu đúng cố định 10 điểm.
-            correct=[x.strip() for x in request.form["correct_short"].split("|") if x.strip()]
-            if game=="bee":
-                points=10
-        elif qtype=="tf4":
-            options=[request.form.get(f"tftext{i}","").strip() for i in range(4)]
-            correct=[request.form.get(f"tf{i}")=="true" for i in range(4)]
-            points=50
-        con.execute("""INSERT INTO questions(round_id,game_type,qtype,content,options_json,correct_json,points,explanation)
-                       VALUES(?,?,?,?,?,?,?,?)""",
-                    (rid,game,qtype,content,json.dumps(options,ensure_ascii=False),
-                     json.dumps(correct,ensure_ascii=False),points,request.form.get("explanation","")))
-        con.commit()
-        flash("Đã thêm câu hỏi.", "success")
-    qs=con.execute("SELECT * FROM questions WHERE round_id=? ORDER BY game_type,id DESC",(rid,)).fetchall()
+        try:
+            v=_question_form_values(r)
+            con.execute("""INSERT INTO questions(round_id,game_type,qtype,content,options_json,correct_json,points,explanation,image_data)
+                           VALUES(?,?,?,?,?,?,?,?,?)""",
+                        (rid,v["game"],v["qtype"],v["content"],json.dumps(v["options"],ensure_ascii=False),
+                         json.dumps(v["correct"],ensure_ascii=False),v["points"],v["explanation"],v["image_data"]))
+            con.commit(); flash("Đã thêm câu hỏi.","success")
+        except ValueError as exc:
+            con.rollback(); flash(str(exc),"danger")
+    qs=con.execute("""SELECT * FROM questions WHERE round_id=?
+                       ORDER BY CASE game_type WHEN 'bee' THEN 1 WHEN 'soccer' THEN 2 WHEN 'basketball' THEN 2 WHEN 'racing' THEN 3 ELSE 9 END, id ASC""",(rid,)).fetchall()
     con.close()
     return render_template("questions.html", r=r, qs=qs)
+
+@app.route("/admin/question/<int:qid>/edit", methods=["GET","POST"])
+def admin_q_edit(qid):
+    admin_required(); con=db()
+    q=con.execute("SELECT * FROM questions WHERE id=?",(qid,)).fetchone()
+    if not q: con.close(); abort(404)
+    r=con.execute("SELECT * FROM rounds WHERE id=?",(q["round_id"],)).fetchone()
+    if request.method=="POST":
+        try:
+            v=_question_form_values(r,q["image_data"])
+            con.execute("""UPDATE questions SET game_type=?,qtype=?,content=?,options_json=?,correct_json=?,points=?,explanation=?,image_data=?
+                           WHERE id=?""",
+                        (v["game"],v["qtype"],v["content"],json.dumps(v["options"],ensure_ascii=False),
+                         json.dumps(v["correct"],ensure_ascii=False),v["points"],v["explanation"],v["image_data"],qid))
+            con.commit(); con.close(); flash("Đã cập nhật câu hỏi.","success")
+            return redirect(url_for("admin_questions",rid=r["id"]))
+        except ValueError as exc:
+            con.rollback(); flash(str(exc),"danger")
+            q=con.execute("SELECT * FROM questions WHERE id=?",(qid,)).fetchone()
+    qv=dict(q); qv["options"]=json.loads(qv.get("options_json") or "[]"); qv["correct"]=json.loads(qv.get("correct_json") or "null")
+    con.close()
+    return render_template("question_edit.html",r=r,q=qv)
 
 @app.route("/admin/question/<int:qid>/delete", methods=["POST"])
 def admin_q_delete(qid):
     admin_required(); con=db()
     q=con.execute("SELECT round_id FROM questions WHERE id=?",(qid,)).fetchone()
     if q:
-        con.execute("DELETE FROM questions WHERE id=?",(qid,)); con.commit()
-        rid=q["round_id"]
+        con.execute("DELETE FROM questions WHERE id=?",(qid,)); con.commit(); rid=q["round_id"]
     else: rid=0
     con.close()
     return redirect(url_for("admin_questions",rid=rid))
