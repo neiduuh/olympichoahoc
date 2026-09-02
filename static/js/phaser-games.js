@@ -111,60 +111,153 @@
         bg.setFillStyle(d===dir?C.yellow:0x0d3854,1); txt.setColor(d===dir?'#142533':'#ffffff');
       });
     }
+
     showBee(o={}){
-      this.clearScene(); this.mode='bee'; this.addSky(); this.drawHills();
-      const g=this.add.graphics(); g.fillStyle(0x4aa84e,1);g.fillRect(0,315,W,185); g.fillStyle(0x3c8f43,1);g.fillRect(0,405,W,95);
-      // flowers
-      for(let i=0;i<34;i++){const x=18+(i*83)%930,y=365+(i*47)%115;g.fillStyle(i%2?0xfff176:0xff8da1,1);g.fillCircle(x,y,3.7);g.fillStyle(0xffffff,.9);g.fillCircle(x+4,y,3);g.fillCircle(x-4,y,3);g.fillCircle(x,y+4,3);}
-      // winding path
-      const pathPts=[{x:90,y:340},{x:225,y:285},{x:350,y:350},{x:485,y:290},{x:615,y:350},{x:742,y:290},{x:870,y:338}];
-      g.lineStyle(20,0xe6c98b,1);g.beginPath();g.moveTo(pathPts[0].x,pathPts[0].y);for(let i=1;i<pathPts.length;i++)g.lineTo(pathPts[i].x,pathPts[i].y);g.strokePath();
-      g.lineStyle(3,0xffffff,.38);g.strokePoints(pathPts,false,false);
-      pathPts.forEach((p,i)=>{
-        const active=i===clamp(o.step||0,0,6),passed=i<(o.step||0),last=i===pathPts.length-1;
-        this.add.circle(p.x,p.y,active?22:16,passed?C.teal:last?C.honey:0xffffff,.94).setStrokeStyle(3,active?C.yellow:0xffffff,.7);
-        if(passed)this.add.image(p.x,p.y,'spark').setScale(.7);
+      this.clearScene();
+      this.mode='bee';
+      this.addSky(0x79d4ff,0xcff4ff);
+      const g=this.add.graphics();
+      g.fillStyle(0x79c35e,1); g.fillRect(0,360,W,140);
+      g.fillStyle(0x65ad4f,1); g.fillRect(0,412,W,88);
+      // wooden frame board
+      const board={x:205,y:70,w:560,h:360,cell:52,cols:7,rows:6};
+      this.refs.beeBoard=board;
+      g.fillStyle(0x8f5b2f,1); g.fillRoundedRect(board.x-18,board.y-18,board.w+36,board.h+36,12);
+      g.fillStyle(0x6d431f,1); g.fillRoundedRect(board.x-12,board.y-12,board.w+24,board.h+24,10);
+      g.fillStyle(0x4d2f17,1); g.fillRect(board.x,board.y,board.w,board.h);
+      // top info panel similar reference
+      this.add.rectangle(215,12,240,48,0x1d2f42,.94).setOrigin(0).setStrokeStyle(3,0xf0d08b,.9);
+      this.add.text(235,26,'ONG TÌM MẬT',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:'#ffffff'});
+      this.add.text(235,49,'Chọn 1 hướng rồi trả lời đúng để di chuyển',{fontFamily:'Arial',fontSize:'13px',color:'#d5efff'});
+      this.add.rectangle(702,12,120,48,0x1d2f42,.94).setOrigin(0).setStrokeStyle(3,0xf0d08b,.9);
+      this.add.text(762,27,'TIẾN ĐỘ',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#d8eefe'}).setOrigin(.5,0);
+      this.add.text(762,44,`${(o.step||0)+1}/7`,{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffd43b'}).setOrigin(.5,0);
+
+      // decorative field around board
+      for(let i=0;i<10;i++){
+        const x=35+i*93;
+        this.add.circle(x,380+((i%3)*16),5,[0xffef87,0xff96b2,0xffffff][i%3],1);
+        this.add.circle(x+7,383+((i%3)*16),4,[0xffffff,0xffef87,0xff96b2][i%3],1);
+      }
+      const progressPath=[{c:0,r:3},{c:1,r:3},{c:1,r:2},{c:2,r:2},{c:3,r:2},{c:4,r:2},{c:5,r:1}];
+      const step=clamp(o.step||0,0,progressPath.length-1);
+      const cellCenter=(c,r)=>({x:board.x+c*board.cell+board.cell/2,y:board.y+r*board.cell+board.cell/2});
+      const current=progressPath[step];
+      this.refs.beeCell=current;
+      // grid lines
+      g.lineStyle(2,0x7a5637,.65);
+      for(let c=0;c<=board.cols;c++){g.beginPath();g.moveTo(board.x+c*board.cell,board.y);g.lineTo(board.x+c*board.cell,board.y+board.h);g.strokePath();}
+      for(let r=0;r<=board.rows;r++){g.beginPath();g.moveTo(board.x,board.y+r*board.cell);g.lineTo(board.x+board.w,board.y+r*board.cell);g.strokePath();}
+
+      // fixed decorative rock cells
+      const rockCells=[[2,0],[4,0],[6,0],[0,1],[3,1],[5,1],[2,3],[4,3],[6,3],[1,4],[3,4],[5,4],[0,5],[2,5],[4,5]];
+      const dirInfo={up:[0,-1,'↑'],down:[0,1,'↓'],left:[-1,0,'←'],right:[1,0,'→']};
+      const targetCells={};
+      Object.entries(dirInfo).forEach(([dir,[dx,dy]])=>{targetCells[dir]={c:current.c+dx,r:current.r+dy};});
+      // remove conflicts near current path visuals
+      const reserved=new Set([`${current.c},${current.r}`]);
+      Object.values(targetCells).forEach(p=>reserved.add(`${p.c},${p.r}`));
+      const hiveCell={c:6,r:5};
+      reserved.add(`${hiveCell.c},${hiveCell.r}`);
+      rockCells.forEach(([c,r])=>{
+        if(reserved.has(`${c},${r}`)) return;
+        const pt=cellCenter(c,r);
+        const rg=this.add.graphics();
+        rg.fillStyle(0x98a0a8,1); rg.fillCircle(pt.x,pt.y,17);
+        rg.fillStyle(0xb8c0c7,1); rg.fillCircle(pt.x-7,pt.y-6,6); rg.fillCircle(pt.x+4,pt.y+2,5);
+        rg.lineStyle(2,0x7b848b,.8); rg.strokeCircle(pt.x,pt.y,17);
       });
-      // honey hive
-      const hive=this.add.container(884,300); const hg=this.add.graphics(); hg.fillStyle(C.honey,1); [0,1,2,3].forEach(i=>hg.fillRoundedRect(-33+i*2,-38+i*18,66-i*4,23,10)); hg.fillStyle(0x55331d,1);hg.fillEllipse(0,28,22,15); hive.add(hg);
-      const step=clamp(o.step||0,0,6),bp=pathPts[step]; const bee=this.add.image(bp.x,bp.y-44,'beeTex').setScale(.78); this.refs.bee=bee;this.refs.pathPts=pathPts;
-      this.tweens.add({targets:bee,y:bee.y-8,duration:650,yoyo:true,repeat:-1,ease:'Sine.inOut'});
-      this.addHeader('ONG TÌM MẬT','Chọn hướng bay • Trả lời đúng để mở đường');
-      this.add.rectangle(790,23,145,48,0x071a29,.8).setOrigin(0).setStrokeStyle(2,0xffffff,.12);this.add.text(862,47,`Đã khóa ${o.blocked?.length||0}/4`,{fontFamily:'Arial',fontSize:'16px',fontStyle:'bold',color:'#ffd9d9'}).setOrigin(.5);
-      const bx=820,by=180; this.refs.blocked=o.blocked||[];this.refs.dirButtons={}; this.onDirection=o.onDirection||null;
+      // path dots / collected honey gems
+      progressPath.forEach((p,i)=>{
+        const pt=cellCenter(p.c,p.r);
+        if(i<step){this.add.circle(pt.x,pt.y,10,0x4fd18d,1).setStrokeStyle(2,0xffffff,.8); this.add.image(pt.x,pt.y,'spark').setScale(.55).setTint(0xffd43b);}
+      });
+      // honey hive goal
+      const hpt=cellCenter(hiveCell.c,hiveCell.r);
+      const hive=this.add.container(hpt.x,hpt.y);
+      const hg=this.add.graphics();
+      hg.fillStyle(C.honey,1);
+      [0,1,2].forEach(i=>hg.fillRoundedRect(-22+i*1.5,-22+i*12,44-i*3,16,8));
+      hg.fillStyle(0x5e3b17,1); hg.fillEllipse(0,20,16,10);
+      hive.add(hg);
+      this.add.text(hpt.x,hpt.y+34,'MẬT',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#fff5c8'}).setOrigin(.5);
+
+      // current bee character
+      const startPt=cellCenter(current.c,current.r);
+      const bee=this.createBeeMiner(startPt.x,startPt.y,.92); this.refs.bee=bee;
+      this.tweens.add({targets:bee,y:bee.y-5,duration:620,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+
+      // available direction target tiles
+      this.refs.blocked=o.blocked||[];
+      this.refs.selectedDir=o.selected||null;
+      this.refs.beeTargets={};
+      Object.entries(dirInfo).forEach(([dir,[dx,dy,label]])=>{
+        const tc=targetCells[dir];
+        const valid=tc.c>=0&&tc.c<board.cols&&tc.r>=0&&tc.r<board.rows;
+        const blocked=this.refs.blocked.includes(dir) || !valid;
+        const pt=valid?cellCenter(tc.c,tc.r):{x:startPt.x+dx*board.cell,y:startPt.y+dy*board.cell};
+        this.refs.beeTargets[dir]={x:pt.x,y:pt.y,c:tc.c,r:tc.r,valid};
+        if(!valid){
+          const rg=this.add.graphics(); rg.fillStyle(0x8d969f,1); rg.fillCircle(pt.x,pt.y,18); rg.fillStyle(0xb4bcc4,1); rg.fillCircle(pt.x-6,pt.y-4,7); rg.lineStyle(2,0x737c84,.7); rg.strokeCircle(pt.x,pt.y,18);
+          return;
+        }
+        const tile=this.add.container(pt.x,pt.y);
+        const bgColor=blocked?0x7b2628:(o.selected===dir?0xffc547:0x9f2224);
+        const txtColor=blocked?'#ffd7d7':(o.selected===dir?'#30210a':'#ffffff');
+        const sq=this.add.rectangle(0,0,42,42,bgColor,1).setStrokeStyle(3,0xe0b56d,.95);
+        const q=this.add.text(0,-2,blocked?'×':'?',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:txtColor}).setOrigin(.5);
+        const gem=this.add.circle(12,12,7,0x4cd0ff,1).setStrokeStyle(2,0xffffff,.8);
+        tile.add([sq,q,gem]);
+      });
+
+      // directional arrow buttons on right
+      this.refs.dirButtons={};
+      const bx=836,by=212;
+      this.onDirection=o.onDirection||null;
       this.refs.dirButtons.up=this.makeButton(bx,by-62,'↑','up',this.refs.blocked.includes('up'),o.selected==='up');
       this.refs.dirButtons.left=this.makeButton(bx-66,by,'←','left',this.refs.blocked.includes('left'),o.selected==='left');
       this.refs.dirButtons.right=this.makeButton(bx+66,by,'→','right',this.refs.blocked.includes('right'),o.selected==='right');
       this.refs.dirButtons.down=this.makeButton(bx,by+62,'↓','down',this.refs.blocked.includes('down'),o.selected==='down');
-      this.add.text(bx,by+108,'CHỌN HƯỚNG',{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#eef9ff'}).setOrigin(.5);
-      // decorative obstacles
-      this.add.circle(536,331,18,0x77513c,1);this.add.circle(550,326,15,0x8a6047,1);this.add.circle(526,320,12,0x674230,1);
-      this.add.rectangle(690,315,16,65,C.wood,1).setRotation(.48);this.add.rectangle(710,315,16,65,C.wood,1).setRotation(-.48);
+      this.add.text(bx,by+104,'CHỌN HƯỚNG',{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#eef9ff'}).setOrigin(.5);
+      this.add.text(838,335,`Đường khóa: ${this.refs.blocked.length}/4`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffe0e0'}).setOrigin(.5);
+
+      // footer legend
+      this.add.rectangle(240,445,520,38,0x1b2b3a,.72).setOrigin(0).setStrokeStyle(2,0xffffff,.1);
+      this.add.text(500,464,'Mỗi lần: chọn ↑ ↓ ← → rồi trả lời đúng để Ong tiến tới ô tiếp theo. Sai sẽ khóa hướng vừa chọn.',{fontFamily:'Arial',fontSize:'13px',color:'#e8f7ff',wordWrap:{width:500}}).setOrigin(.5);
     }
-    beeOutcome(ok,dir,blockedCount){
+
+beeOutcome(ok,dir,blockedCount){
       return new Promise(resolve=>{
-        const bee=this.refs.bee;if(!bee){resolve();return;}
+        const bee=this.refs.bee;
+        if(!bee){resolve();return;}
+        const target=this.refs.beeTargets?.[dir] || {x:bee.x,y:bee.y};
         if(ok){
-          const step=clamp((this.refs.pathPts||[]).findIndex(p=>Math.abs(p.x-bee.x)<2)+1,0,6); const t=(this.refs.pathPts||[])[step];
           this.tweens.killTweensOf(bee);
-          const glow=this.add.circle(bee.x,bee.y,30,C.yellow,.24);this.tweens.add({targets:glow,scale:2.1,alpha:0,duration:700});
-          for(let i=0;i<12;i++){const s=this.add.image(bee.x,bee.y,'spark').setScale(.35+Math.random()*.35);this.tweens.add({targets:s,x:bee.x-25+Math.random()*50,y:bee.y-65+Math.random()*75,alpha:0,duration:650+Math.random()*350,onComplete:()=>s.destroy()});}
-          if(t)this.tweens.add({targets:bee,x:t.x,y:t.y-44,duration:900,ease:'Sine.inOut',onComplete:()=>{this.popMessage('ĐÚNG! ĐƯỜNG ĐÃ MỞ','#d8ffeb',C.green);resolve();}}); else resolve();
+          const trail=this.add.circle(bee.x,bee.y,26,C.yellow,.22);
+          this.tweens.add({targets:trail,scale:2.2,alpha:0,duration:650,onComplete:()=>trail.destroy()});
+          for(let i=0;i<10;i++){
+            const s=this.add.image(bee.x,bee.y,'spark').setScale(.3+Math.random()*.25).setTint(i%2?0xffd43b:0xffffff);
+            this.tweens.add({targets:s,x:bee.x-25+Math.random()*50,y:bee.y-40+Math.random()*80,alpha:0,angle:180+Math.random()*200,duration:550+Math.random()*300,onComplete:()=>s.destroy()});
+          }
+          this.tweens.add({targets:bee,x:target.x,y:target.y,duration:650,ease:'Sine.inOut',onComplete:()=>{this.popMessage('ĐÚNG! ONG ĐÃ TIẾN LÊN','#d8ffeb',C.green);resolve();}});
         }else{
-          this.cameras.main.shake(250,.008); const p=this.directionPoint(dir,bee.x,bee.y); const rock=this.add.container(p.x,p.y); const rg=this.add.graphics();rg.fillStyle(0x66717a,1);rg.fillCircle(0,0,28);rg.fillStyle(0x86929b,1);rg.fillCircle(-8,-8,9);rock.add(rg);rock.setScale(.1);this.tweens.add({targets:rock,scale:1,duration:300,ease:'Back.out'});
-          this.tweens.add({targets:bee,x:'-=18',duration:90,yoyo:true,repeat:3,ease:'Sine.inOut'});
-          this.popMessage(blockedCount>=4?'HẾT ĐƯỜNG!':'HƯỚNG NÀY BỊ KHÓA','#ffe0e0',C.red);
-          this.time.delayedCall(900,resolve);
+          this.cameras.main.shake(250,.008);
+          const p=target.valid?target:this.directionPoint(dir,bee.x,bee.y);
+          const rock=this.add.container(p.x,p.y);
+          const rg=this.add.graphics();
+          rg.fillStyle(0x7d858d,1); rg.fillCircle(0,0,20); rg.fillStyle(0xaab1b8,1); rg.fillCircle(-6,-5,7); rg.fillCircle(5,2,5); rg.lineStyle(2,0x666d74,.8); rg.strokeCircle(0,0,20);
+          rock.add(rg); rock.setScale(.1);
+          this.tweens.add({targets:rock,scale:1,duration:260,ease:'Back.out'});
+          this.tweens.add({targets:bee,x:'-=12',duration:85,yoyo:true,repeat:3,ease:'Sine.inOut'});
+          this.popMessage(blockedCount>=4?'HẾT ĐƯỜNG!':'SAI - HƯỚNG ĐÃ BỊ KHÓA','#ffe0e0',C.red);
+          this.time.delayedCall(850,resolve);
         }
       });
     }
-    directionPoint(dir,x,y){const d={up:[0,-85],down:[0,80],left:[-90,0],right:[90,0]}[dir]||[60,0];return {x:x+d[0],y:y+d[1]};}
-    drawStadiumBase(){
-      this.addSky(0x69c8ef,0xbceaff);
-      const g=this.add.graphics();g.fillStyle(0x172d45,1);g.fillRect(0,130,W,130);g.fillStyle(0x253f59,1);g.fillRect(0,150,W,90);
-      for(let row=0;row<4;row++)for(let i=0;i<32;i++){g.fillStyle([0xf8f8f8,0x2a8adb,0xffd34b,0xd84c56][(i+row)%4],.78);g.fillCircle(14+i*31,164+row*18,5)}
-      g.fillStyle(0x2b9a50,1);g.fillRect(0,250,W,250);for(let i=0;i<8;i++){g.fillStyle(i%2?0x319f55:0x2c914d,.55);g.fillRect(i*120,250,120,250)}
-      g.lineStyle(4,0xffffff,.8);g.strokeRect(570,278,340,190);g.beginPath();g.moveTo(0,470);g.lineTo(W,470);g.strokePath();
+    directionPoint(dir,x,y){
+      if(this.mode==='bee' && this.refs.beeTargets?.[dir]) return this.refs.beeTargets[dir];
+      const d={up:[0,-85],down:[0,80],left:[-90,0],right:[90,0]}[dir]||[60,0];
+      return {x:x+d[0],y:y+d[1]};
     }
     createPlayer(x,y,shirt=0x2c70d6,scale=1){
       const c=this.add.container(x,y).setScale(scale),g=this.add.graphics();
@@ -193,6 +286,30 @@
       g.fillStyle(0xf2a22f,1);g.fillTriangle(-9,-20,9,-20,0,-7);
       c.add(g); return c;
     }
+
+    createBeeMiner(x,y,scale=1){
+      const c=this.add.container(x,y).setScale(scale);
+      const g=this.add.graphics();
+      // shadow
+      g.fillStyle(0x0d1b24,.18); g.fillEllipse(0,46,68,16);
+      // wings
+      g.fillStyle(0xeaf8ff,.72); g.fillEllipse(-20,-2,28,18); g.fillEllipse(12,-2,28,18);
+      g.lineStyle(2,0xcfe6f2,.9); g.strokeEllipse(-20,-2,28,18); g.strokeEllipse(12,-2,28,18);
+      // body
+      g.fillStyle(C.yellow,1); g.fillEllipse(0,12,58,40); g.lineStyle(3,0x1a232b,1); g.strokeEllipse(0,12,58,40);
+      g.fillStyle(0x1a232b,1); g.fillRect(-14,-3,8,28); g.fillRect(6,-3,8,28);
+      // face
+      g.fillStyle(0xffd574,1); g.fillCircle(25,6,18); g.lineStyle(3,0x1a232b,1); g.strokeCircle(25,6,18);
+      g.fillStyle(0x1a232b,1); g.fillCircle(20,2,3); g.fillCircle(30,2,3); g.lineStyle(2,0x1a232b,1); g.beginPath(); g.moveTo(21,13); g.quadraticCurveTo(25,16,29,13); g.strokePath();
+      // miner helmet
+      g.fillStyle(0xf8c72d,1); g.fillRoundedRect(5,-20,42,16,7); g.fillCircle(26,-22,18); g.lineStyle(3,0x935f12,1); g.strokeRoundedRect(5,-20,42,16,7); g.strokeCircle(26,-22,18);
+      g.fillStyle(0xf4f7ff,1); g.fillCircle(26,-22,8); g.lineStyle(2,0xa5b4c2,1); g.strokeCircle(26,-22,8); g.fillStyle(0x6ad6ff,1); g.fillCircle(26,-22,4);
+      // feet
+      g.lineStyle(5,0x1a232b,1); g.beginPath(); g.moveTo(-10,28); g.lineTo(-14,40); g.moveTo(10,28); g.lineTo(14,40); g.strokePath();
+      c.add(g);
+      return c;
+    }
+
     drawSoccerChemGarden(){
       const g=this.add.graphics();
       // blue sky
