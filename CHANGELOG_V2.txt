@@ -1,0 +1,38 @@
+OLYMPIC HÓA HỌC - MINI GAME V2
+
+1. Cấu trúc mỗi vòng thi
+- Luôn có: Ong tìm mật + Lái xe vượt chướng ngại vật.
+- Khi Admin tạo vòng, hệ thống bốc ngẫu nhiên đúng 1 trong 2 game: Sút bóng vào lưới / Ném bóng vào rổ.
+- Kết quả bốc được lưu cố định cho vòng; mọi học sinh và mọi lần thi lại cùng vòng dùng cùng game thể thao.
+
+2. Ong tìm mật
+- Người chơi chọn hướng lên/xuống/trái/phải.
+- Trả lời ngắn.
+- Đúng: ong bay tiếp, các hướng bị chặn tại nút hiện tại được xóa.
+- Sai: khóa hướng vừa chọn.
+- Nếu 4 hướng cùng bị khóa: kết thúc mini game, giữ số điểm đã có.
+- Tối đa 20 phút cho mini game.
+- Lấy ngẫu nhiên tối đa 10 câu từ ngân hàng của vòng.
+
+3. Sút bóng vào lưới
+- Tối đa 10 câu trắc nghiệm 4 phương án.
+- 2 phút/câu, 10 điểm/câu.
+- Đúng: hoạt ảnh bóng vào lưới.
+- Sai: thủ môn cản hoặc bóng sút ra ngoài.
+
+4. Ném bóng vào rổ
+- Tối đa 10 câu trắc nghiệm 4 phương án.
+- 2 phút/câu, 10 điểm/câu.
+- Đúng: hoạt ảnh bóng vào rổ.
+- Sai: hoạt ảnh bóng bật vành/ném lệch.
+
+5. Lái xe vượt chướng ngại vật
+- 2 câu, mỗi câu 4 ý Đúng/Sai.
+- 10 phút/câu.
+- Đúng 1/2/3/4 ý tương ứng 5/15/25/50 điểm.
+- Xe tiến xa theo số điểm đạt được.
+
+6. Admin
+- Trang vòng thi hiển thị game thể thao đã bốc.
+- Trang nhập câu hỏi chỉ cho nhập 3 game thực sự xuất hiện trong vòng đó.
+- Điểm game thể thao được khóa 10 điểm/câu ở server; game lái xe khóa 50 điểm/câu tối đa.

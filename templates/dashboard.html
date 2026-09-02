@@ -1,0 +1,8 @@
+
+{% extends "base.html" %}{% block content %}
+<h1>Xin chào, {{u.full_name or u.username}}</h1>
+{% if not u.approved %}<div class="card"><h3>⏳ Tài khoản đang chờ duyệt</h3><p>Admin cần duyệt tài khoản và phân khối trước khi bạn được dự thi.</p>{% if not u.full_name %}<a class="btn" href="{{url_for('profile')}}">Điền hồ sơ</a>{% endif %}</div>
+{% else %}<p>Khối được phép dự thi: <b>{{u.grade_group}}</b></p><div class="grid">{% for r in rounds %}<div class="card"><h3>{{r.title}}</h3><p>{{r.description}}</p><a class="btn" href="{{url_for('play',round_id=r.id)}}">Bắt đầu / Thi lại</a></div>{% else %}<div class="card">Chưa có vòng phù hợp.</div>{% endfor %}</div>{% endif %}
+<h2 style="margin-top:28px">Lịch sử thi</h2><table><tr><th>Vòng</th><th>Điểm</th><th>Thời gian</th><th>Lỗi chuyển tab</th><th>Hoàn thành</th></tr>
+{% for s in stats %}<tr><td>{{s.title}}</td><td>{{s.score}}</td><td>{{s.elapsed_seconds}} giây</td><td>{{s.violations}}</td><td>{{s.finished_at}}</td></tr>{% else %}<tr><td colspan="5">Chưa có lượt thi.</td></tr>{% endfor %}</table>
+{% endblock %}

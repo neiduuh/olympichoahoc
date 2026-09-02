@@ -1,0 +1,18 @@
+
+{% extends "base.html" %}{% block content %}<h1>Nhập câu hỏi – {{r.title}}</h1>
+<div class="card" style="margin-bottom:16px"><b>3 mini game của vòng này:</b> 🐝 Ong tìm mật + {{'⚽ Sút bóng vào lưới' if r.selected_sport=='soccer' else '🏀 Ném bóng vào rổ'}} + 🏍️ Lái xe. Game thể thao đã được hệ thống bốc ngẫu nhiên khi tạo vòng và giữ cố định cho toàn bộ thí sinh.</div>
+<div class="card"><form method="post" id="qform">
+<div class="grid"><div class="field"><label>Mini game</label><select name="game_type" id="game" onchange="syncType()"><option value="bee">🐝 Ong tìm mật</option>{% if r.selected_sport=='soccer' %}<option value="soccer">⚽ Sút bóng</option>{% else %}<option value="basketball">🏀 Ném bóng</option>{% endif %}<option value="racing">🏍️ Lái xe</option></select></div>
+<div class="field"><label>Dạng câu</label><select name="qtype" id="qtype" onchange="showFields()"><option value="short">Trả lời ngắn</option><option value="mcq">Trắc nghiệm 4 phương án</option><option value="tf4">4 ý đúng/sai</option></select></div></div>
+<div class="field"><label>Nội dung câu hỏi</label><textarea name="content" required></textarea></div>
+<div id="mcq" style="display:none"><div class="grid">{% for i in range(4) %}<div class="field"><label>Phương án {{i+1}}</label><input name="opt{{i}}"></div>{% endfor %}</div><div class="field"><label>Đáp án đúng</label><select name="correct_mcq"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select></div></div>
+<div id="short"><div class="field"><label>Đáp án đúng</label><input name="correct_short" placeholder="Có thể nhập nhiều đáp án, ngăn cách bằng |"></div></div>
+<div id="tf4" style="display:none">{% for i in range(4) %}<div class="grid"><div class="field"><label>Ý {{i+1}}</label><input name="tftext{{i}}"></div><div class="field"><label>Đúng/Sai</label><select name="tf{{i}}"><option value="true">Đúng</option><option value="false">Sai</option></select></div></div>{% endfor %}</div>
+<div class="grid"><div class="field"><label>Điểm câu</label><input type="number" name="points" value="10"></div><div class="field"><label>Giải thích sau khi trả lời</label><input name="explanation"></div></div>
+<button class="btn">Thêm câu hỏi</button></form></div>
+<h2>Danh sách câu hỏi</h2><table><tr><th>#</th><th>Game</th><th>Dạng</th><th>Câu hỏi</th><th>Điểm</th><th></th></tr>{% for q in qs %}<tr><td>{{q.id}}</td><td>{{q.game_type}}</td><td>{{q.qtype}}</td><td>{{q.content}}</td><td>{{q.points}}</td><td><form method="post" action="{{url_for('admin_q_delete',qid=q.id)}}"><button class="btn danger small">Xóa</button></form></td></tr>{% endfor %}</table>
+<script>
+function syncType(){let g=document.getElementById('game').value,q=document.getElementById('qtype'); if(g==='bee')q.value='short'; if(g==='soccer'||g==='basketball')q.value='mcq'; if(g==='racing')q.value='tf4'; showFields();}
+function showFields(){let t=document.getElementById('qtype').value;['mcq','short','tf4'].forEach(x=>document.getElementById(x).style.display=x===t?'block':'none');}
+syncType();
+</script>{% endblock %}

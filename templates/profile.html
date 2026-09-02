@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block content %}<div class="card form-card"><h2>Hoàn thiện hồ sơ</h2><form method="post">
+<div class="field"><label>Họ và tên</label><input name="full_name" required></div><div class="field"><label>Ngày sinh</label><input type="date" name="dob" required></div>
+<div class="field"><label>Giới tính</label><select name="gender"><option>Nam</option><option>Nữ</option><option>Khác</option></select></div>
+<div class="field"><label>Lớp</label><input name="class_name" placeholder="VD: 11A1" required></div><div class="field"><label>Số điện thoại</label><input name="phone" required></div>
+<button class="btn">Gửi yêu cầu duyệt</button></form></div>{% endblock %}

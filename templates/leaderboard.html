@@ -1,0 +1,5 @@
+
+{% extends "base.html" %}{% block content %}<h1>🏆 Bảng xếp hạng</h1>
+<form method="get" class="card" style="margin-bottom:16px"><div class="field"><label>Chọn vòng thi</label><select name="round_id" onchange="this.form.submit()"><option value="">-- Chọn vòng --</option>{% for r in rounds %}<option value="{{r.id}}" {% if selected==r.id %}selected{% endif %}>{{r.title}}</option>{% endfor %}</select></div></form>
+<table><tr><th>Hạng</th><th>Thí sinh</th><th>Lớp</th><th>Số lần thi</th><th>Điểm cao nhất</th><th>Thời gian tốt nhất</th></tr>
+{% for x in rows %}<tr><td><b>#{{loop.index}}</b></td><td>{{x.full_name}}</td><td>{{x.class_name}}</td><td>{{x.attempt_count}}</td><td>{{x.best_score}}</td><td>{{x.best_time}} giây</td></tr>{% else %}<tr><td colspan="6">Chưa có dữ liệu xếp hạng.</td></tr>{% endfor %}</table>{% endblock %}
