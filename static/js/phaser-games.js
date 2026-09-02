@@ -96,20 +96,20 @@
     }
     makeButton(x,y,label,dir,blocked,selected){
       const fill=blocked?0x5d6670:(selected?C.yellow:0x0d3854), txt=blocked?'×':label;
-      const c=this.add.container(x,y); const bg=this.add.rectangle(0,0,62,56,fill,.98).setStrokeStyle(2,blocked?0x85909a:0x77bddb,.85);
-      const t=this.add.text(0,-2,txt,{...labelStyle(28,blocked?'#d8dde1':selected?'#142533':'#ffffff'),strokeThickness:0}).setOrigin(.5);
-      c.add([bg,t]);
+      const bg=this.add.rectangle(x,y,62,56,fill,.98).setStrokeStyle(3,blocked?0x85909a:0x77bddb,.95).setDepth(41);
+      const t=this.add.text(x,y-2,txt,{...labelStyle(30,blocked?'#d8dde1':selected?'#142533':'#ffffff'),strokeThickness:0}).setOrigin(.5).setDepth(42);
+      const obj={list:[bg,t],x,y,dir};
       if(!blocked){
         bg.setInteractive({useHandCursor:true});
-        bg.on('pointerover',()=>{if(!this.refs.beeDirectionLocked)bg.setScale(1.05);});
-        bg.on('pointerout',()=>bg.setScale(1));
+        bg.on('pointerover',()=>{if(!this.refs.beeDirectionLocked){bg.setScale(1.08);t.setScale(1.08);}});
+        bg.on('pointerout',()=>{bg.setScale(1);t.setScale(1);});
         bg.on('pointerdown',()=>{
           if(this.refs.beeDirectionLocked)return;
           this.selectDirection(dir);
           if(this.onDirection)this.onDirection(dir);
         });
       }
-      return c;
+      return obj;
     }
     selectDirection(dir){
       this.refs.selectedDir=dir;
@@ -215,23 +215,26 @@
         const pt=valid?cellCenter(tc.c,tc.r):{x:startPt.x+dx*board.cell,y:startPt.y+dy*board.cell};
         this.refs.beeTargets[dir]={x:pt.x,y:pt.y,c:tc.c,r:tc.r,valid};
         if(!valid || blocked){
-          const rock=this.add.container(pt.x,pt.y).setDepth(14);
-          const rg=this.add.graphics();
-          rg.fillStyle(0x7e878f,1); rg.fillCircle(0,1,20);
-          rg.fillStyle(0xaeb6bd,1); rg.fillCircle(-7,-6,7); rg.fillCircle(5,2,5);
-          rg.lineStyle(2,0x676f76,.9); rg.strokeCircle(0,1,20);
-          rock.add(rg);
-          this.refs.beeTargetTiles[dir]=rock;
+          const rock=this.add.graphics().setPosition(pt.x,pt.y).setDepth(18);
+          rock.fillStyle(0x7e878f,1); rock.fillCircle(0,1,20);
+          rock.fillStyle(0xaeb6bd,1); rock.fillCircle(-7,-6,7); rock.fillCircle(5,2,5);
+          rock.lineStyle(2,0x676f76,.9); rock.strokeCircle(0,1,20);
+          this.refs.beeTargetTiles[dir]={objects:[rock],rock:true};
           return;
         }
-        const tile=this.add.container(pt.x,pt.y).setDepth(15);
-        const bgColor=o.selected===dir?0xffc547:0x9f2224;
-        const txtColor=o.selected===dir?'#30210a':'#ffffff';
-        const sq=this.add.rectangle(0,0,42,42,bgColor,1).setStrokeStyle(3,0xe0b56d,.95);
-        const q=this.add.text(0,-2,'?',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:txtColor}).setOrigin(.5);
-        const gem=this.add.circle(12,12,7,0x4cd0ff,1).setStrokeStyle(2,0xffffff,.8);
-        tile.add([sq,q,gem]);
-        this.refs.beeTargetTiles[dir]=tile;
+        const sq=this.add.rectangle(pt.x,pt.y,43,43,o.selected===dir?0xffc547:0x9f2224,1)
+          .setStrokeStyle(3,0xe0b56d,.98).setDepth(19).setInteractive({useHandCursor:true});
+        const q=this.add.text(pt.x,pt.y-2,'?',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:o.selected===dir?'#30210a':'#ffffff'}).setOrigin(.5).setDepth(20);
+        const gem=this.add.circle(pt.x+12,pt.y+12,7,0x4cd0ff,1).setStrokeStyle(2,0xffffff,.85).setDepth(21);
+        const arrow=this.add.text(pt.x-13,pt.y-14,label,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff3a6',stroke:'#6e260e',strokeThickness:3}).setOrigin(.5).setDepth(22);
+        sq.on('pointerover',()=>{if(!this.refs.beeDirectionLocked){sq.setScale(1.08);q.setScale(1.08);gem.setScale(1.08);arrow.setScale(1.08);}});
+        sq.on('pointerout',()=>{sq.setScale(1);q.setScale(1);gem.setScale(1);arrow.setScale(1);});
+        sq.on('pointerdown',()=>{
+          if(this.refs.beeDirectionLocked)return;
+          this.selectDirection(dir);
+          if(this.onDirection)this.onDirection(dir);
+        });
+        this.refs.beeTargetTiles[dir]={objects:[sq,q,gem,arrow],rock:false};
       });
 
       // left player info column
@@ -249,9 +252,23 @@
       this.add.text(panelX+18,310,'★  ĐIỂM',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
       this.refs.beeScore=this.add.text(panelX+79,350,String(o.score??0),{...labelStyle(30,'#ffd844'),strokeThickness:2}).setOrigin(.5);
 
+      // 4 mũi tên nhỏ ngay quanh Ong để thí sinh luôn thấy hướng có thể đi
+      const miniDirs={up:[0,-46,'↑'],down:[0,46,'↓'],left:[-46,0,'←'],right:[46,0,'→']};
+      Object.entries(miniDirs).forEach(([dir,[dx,dy,symbol]])=>{
+        const blocked=this.refs.blocked.includes(dir) || !this.refs.beeTargets?.[dir]?.valid;
+        const b=this.add.circle(startPt.x+dx,startPt.y+dy,15,blocked?0x59636c:0x0f6f9c,.95).setStrokeStyle(2,blocked?0x86919a:0xb8efff,1).setDepth(45);
+        const t=this.add.text(startPt.x+dx,startPt.y+dy-1,blocked?'×':symbol,{fontFamily:'Arial',fontSize:'20px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(46);
+        if(!blocked){
+          b.setInteractive({useHandCursor:true});
+          b.on('pointerdown',()=>{if(this.refs.beeDirectionLocked)return;this.selectDirection(dir);if(this.onDirection)this.onDirection(dir);});
+          b.on('pointerover',()=>{b.setScale(1.14);t.setScale(1.14);});
+          b.on('pointerout',()=>{b.setScale(1);t.setScale(1);});
+        }
+      });
+
       // directional arrow buttons on right
       this.refs.dirButtons={};
-      const bx=836,by=212;
+      const bx=850,by=205;
       this.onDirection=o.onDirection||null;
       this.refs.dirButtons.up=this.makeButton(bx,by-62,'↑','up',this.refs.blocked.includes('up'),o.selected==='up');
       this.refs.dirButtons.left=this.makeButton(bx-66,by,'←','left',this.refs.blocked.includes('left'),o.selected==='left');
@@ -272,6 +289,9 @@
         const bg=obj?.list?.[0];
         if(bg && bg.input) bg.disableInteractive();
       });
+      Object.values(this.refs.beeTargetTiles||{}).forEach(tile=>{
+        const sq=tile?.objects?.[0]; if(sq?.input) sq.disableInteractive();
+      });
     }
     unlockBeeDirections(){
       this.refs.beeDirectionLocked=false;
@@ -279,6 +299,11 @@
         if((this.refs.blocked||[]).includes(dir))return;
         const bg=obj?.list?.[0];
         if(bg) bg.setInteractive({useHandCursor:true});
+      });
+      Object.entries(this.refs.beeTargetTiles||{}).forEach(([dir,tile])=>{
+        if((this.refs.blocked||[]).includes(dir) || tile?.rock)return;
+        const sq=tile?.objects?.[0];
+        if(sq) sq.setInteractive({useHandCursor:true});
       });
     }
     beeApproachObstacle(dir){
@@ -295,7 +320,7 @@
         if(this.refs.beeHalo) this.refs.beeHalo.setVisible(false);
         if(this.refs.beeLabel) this.refs.beeLabel.setVisible(false);
         const tile=this.refs.beeTargetTiles?.[dir];
-        if(tile && tile.setScale) this.tweens.add({targets:tile,scale:1.1,duration:160,yoyo:true,repeat:1});
+        if(tile?.objects?.length) this.tweens.add({targets:tile.objects,scale:1.1,duration:160,yoyo:true,repeat:1});
         this.tweens.add({targets:bee,x:stopX,y:stopY,duration:520,ease:'Sine.inOut',onComplete:()=>{
           this.refs.beeApproachPos={x:stopX,y:stopY};
           this.popMessage('GẶP CHƯỚNG NGẠI - TRẢ LỜI CÂU HỎI','#fff7d6',C.amber);
@@ -313,7 +338,7 @@
         if(ok){
           this.tweens.killTweensOf(bee);
           const tile=this.refs.beeTargetTiles?.[dir];
-          if(tile){this.tweens.add({targets:tile,alpha:0,scale:.15,duration:260,ease:'Back.in'});}
+          if(tile?.objects?.length){this.tweens.add({targets:tile.objects,alpha:0,scale:.15,duration:260,ease:'Back.in'});}
           const trail=this.add.circle(bee.x,bee.y,26,C.yellow,.22).setDepth(26);
           this.tweens.add({targets:trail,scale:2.2,alpha:0,duration:650,onComplete:()=>trail.destroy()});
           for(let i=0;i<12;i++){
@@ -327,7 +352,7 @@
         }else{
           this.cameras.main.shake(250,.008);
           const tile=this.refs.beeTargetTiles?.[dir];
-          if(tile) this.tweens.add({targets:tile,rotation:.08,duration:70,yoyo:true,repeat:4});
+          if(tile?.objects?.length) this.tweens.add({targets:tile.objects,angle:6,duration:70,yoyo:true,repeat:4});
           this.tweens.add({targets:bee,x:home.x,y:home.y,duration:470,ease:'Sine.inOut',onComplete:()=>{
             if(this.refs.beeHalo){this.refs.beeHalo.setPosition(home.x,home.y).setVisible(true);}
             if(this.refs.beeLabel){this.refs.beeLabel.setPosition(home.x,home.y-48).setVisible(true);}

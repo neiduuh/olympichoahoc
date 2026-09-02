@@ -91,7 +91,7 @@ if(!phaserOK){
   return;
 }
 try{
-  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}");
+  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.7");
 }catch(e){
   fallbackBox.hidden=false;
   fallbackBox.textContent='Đã tải Phaser nhưng không tải được mã mini game. Hãy tải lại trang.';
@@ -237,7 +237,7 @@ function renderBee(q,n){
       }
     }
   });
-  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>🐝 Hãy điều khiển Ong trên bản đồ.</b><br><span>Chọn ↑ ↓ ← →. Ong sẽ bay tới chướng ngại vật; lúc đó câu hỏi mới hiện ra.</span><span id="qtime" style="display:none"></span></div>`;
+  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>🐝 Hãy điều khiển Ong trên bản đồ.</b><br><span>Bấm ô dấu hỏi cạnh Ong hoặc chọn ↑ ↓ ← →. Ong sẽ bay tới chướng ngại vật; lúc đó câu hỏi mới hiện ra.</span><span id="qtime" style="display:none"></span></div>`;
   startQuestionTimer(remaining);
 }
 function showBeeQuestion(q,n){
