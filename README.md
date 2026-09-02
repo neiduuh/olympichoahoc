@@ -49,3 +49,7 @@ python app.py
 ## Tài khoản Admin
 Nếu database mới và không đặt `ADMIN_INITIAL_PASSWORD`, mặc định vẫn là `admin / Admin@123`.
 Khuyến nghị đặt `ADMIN_INITIAL_PASSWORD` trên Render trước lần chạy đầu tiên.
+
+
+## V4.1 build fix
+- Cập nhật psycopg binary từ 3.2.9 sang >=3.2.13,<3.4 để tương thích Python mới trên Render.

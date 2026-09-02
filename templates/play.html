@@ -81,6 +81,7 @@ async function ensurePhaserLoaded(){
   return false;
 }
 const phaserOK=await ensurePhaserLoaded();
+if(phaserOK){ fallbackBox.hidden=true; }
 if(!phaserOK){
   fallbackBox.hidden=false;
   fallbackBox.innerHTML='<strong>Không tải được bộ máy đồ họa Phaser.</strong><br>Website đã thử bản cục bộ và 3 máy chủ dự phòng nhưng đều không thành công.<br><button type="button" class="btn" id="retryPhaser" style="margin-top:14px">Tải lại game</button>';

@@ -1,0 +1,6 @@
+OLYMPIC HÓA HỌC V4.2 - FIX PHASER OVERLAY
+
+- Sửa lỗi lớp .phaser-fallback luôn display:grid làm ghi đè thuộc tính hidden.
+- Thêm .phaser-fallback[hidden]{display:none!important}.
+- Sau khi Phaser tải thành công, play.html chủ động đặt fallbackBox.hidden=true.
+- Không thay đổi Supabase/database/game logic.
