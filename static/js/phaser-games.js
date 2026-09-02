@@ -210,6 +210,21 @@
         tile.add([sq,q,gem]);
       });
 
+      // left player info column
+      const panelX=18,panelW=158;
+      this.add.rectangle(panelX,80,panelW,118,0x6a3414,.95).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
+      this.add.circle(panelX+79,113,27,0xeef7ff,1).setStrokeStyle(3,0xffffff,.8);
+      this.add.circle(panelX+79,109,11,0xa8b7c5,1); this.add.ellipse(panelX+79,137,40,25,0xa8b7c5,1);
+      const pname=String(o.playerName||'Thí sinh');
+      this.add.text(panelX+79,154,pname.length>19?pname.slice(0,18)+'…':pname,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(panelX+79,175,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'11px',color:'#fff0d8'}).setOrigin(.5);
+      this.add.rectangle(panelX,206,panelW,82,0x7b4318,.97).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
+      this.add.text(panelX+18,220,'⏱  THỜI GIAN',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
+      this.refs.beeTimer=this.add.text(panelX+79,260,this.formatSoccerTime(o.timeLeft??1200),{...labelStyle(28,'#ffd844'),strokeThickness:2}).setOrigin(.5);
+      this.add.rectangle(panelX,296,panelW,82,0x6a3414,.97).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
+      this.add.text(panelX+18,310,'★  ĐIỂM',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
+      this.refs.beeScore=this.add.text(panelX+79,350,String(o.score??0),{...labelStyle(30,'#ffd844'),strokeThickness:2}).setOrigin(.5);
+
       // directional arrow buttons on right
       this.refs.dirButtons={};
       const bx=836,by=212;
@@ -422,32 +437,112 @@ beeOutcome(ok,dir,blockedCount){
     }
     spawnSoccerConfetti(){for(let i=0;i<28;i++){const x=420+Math.random()*280,y=155+Math.random()*70;const s=this.add.image(x,y,'spark').setTint([0xffd43b,0x5ee4ff,0xff7887,0xffffff][i%4]).setScale(.28+Math.random()*.25).setDepth(25);this.tweens.add({targets:s,x:x-60+Math.random()*120,y:y+110+Math.random()*80,angle:300+Math.random()*360,alpha:0,duration:700+Math.random()*500,onComplete:()=>s.destroy()});}}
     netPulse(){const r=this.add.rectangle(this.mode==='soccer'?560:790,this.mode==='soccer'?230:357,this.mode==='soccer'?310:215,this.mode==='soccer'?160:140,0x9fffc4,.13);this.tweens.add({targets:r,alpha:0,scale:1.08,duration:550,onComplete:()=>r.destroy()});}
+
     showBasketball(o={}){
-      this.clearScene();this.mode='basketball';
-      // arena wall
-      const bg=this.add.graphics(); bg.fillStyle(0x162338,1);bg.fillRect(0,0,W,270);bg.fillStyle(0x24344d,1);bg.fillRect(0,80,W,170);
-      for(let row=0;row<5;row++)for(let i=0;i<35;i++){bg.fillStyle([0xf8f8f8,0xf7ba3c,0x4e86d7,0xe35b67][(i+row)%4],.72);bg.fillCircle(8+i*28,110+row*24,5)}
-      bg.fillStyle(0xc9793a,1);bg.fillRect(0,250,W,250);for(let i=0;i<12;i++){bg.fillStyle(i%2?0xcf8547:0xc17438,.38);bg.fillRect(i*80,250,80,250)}
-      bg.lineStyle(5,0xffffff,.7);bg.strokeCircle(480,470,165);bg.beginPath();bg.moveTo(0,470);bg.lineTo(W,470);bg.strokePath();
-      this.addHeader('NÉM BÓNG VÀO RỔ','10 câu • 10 điểm/câu • 2 phút/câu',C.orange);
+      this.clearScene();
+      this.mode='basketball';
+      this.refs.basketLocked=false;
+      this.refs.onBasketAnswer=o.onAnswer||null;
+      // arena background
+      const bg=this.add.graphics();
+      bg.fillStyle(0x13304a,1); bg.fillRect(0,0,W,165);
+      bg.fillStyle(0x1e4566,1); bg.fillRect(0,95,W,70);
+      for(let row=0;row<4;row++) for(let i=0;i<32;i++){
+        bg.fillStyle([0xf7f7f7,0xf7b733,0x4e86d7,0xe0626b][(i+row)%4],.72);
+        bg.fillCircle(16+i*30,112+row*16,4.5);
+      }
+      bg.fillStyle(0xc67e42,1); bg.fillRect(0,165,W,335);
+      for(let i=0;i<12;i++){ bg.fillStyle(i%2?0xcf8851:0xba7239,.35); bg.fillRect(i*80,165,80,335); }
+      bg.lineStyle(5,0xffffff,.78); bg.beginPath(); bg.moveTo(110,470); bg.lineTo(850,470); bg.strokePath();
+      bg.strokeCircle(480,468,138);
+      bg.fillStyle(0x7cb8de,1); bg.fillRect(720,92,150,70); bg.fillStyle(0x9dd7f1,1); bg.fillRect(730,104,28,24); bg.fillRect(770,104,28,24); bg.fillRect(810,104,28,24);
+      bg.fillStyle(0x5aa15b,1); bg.fillRect(0,145,W,20);
+
+      // left contestant / timer / score column
+      const panelX=12,panelW=158;
+      this.add.rectangle(panelX,10,panelW,118,0x6a3414,.95).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
+      this.add.circle(panelX+79,43,27,0xeef7ff,1).setStrokeStyle(3,0xffffff,.8);
+      this.add.circle(panelX+79,39,11,0xa8b7c5,1); this.add.ellipse(panelX+79,67,40,25,0xa8b7c5,1);
+      const name=String(o.playerName||'Thí sinh');
+      this.add.text(panelX+79,84,name.length>19?name.slice(0,18)+'…':name,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(panelX+79,105,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'11px',color:'#fff0d8'}).setOrigin(.5);
+
+      this.add.rectangle(panelX,136,panelW,82,0x7b4318,.97).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
+      this.add.text(panelX+18,150,'⏱  THỜI GIAN',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
+      this.refs.basketTimer=this.add.text(panelX+79,190,this.formatSoccerTime(o.timeLeft??120),{...labelStyle(32,'#ffd844'),strokeThickness:2}).setOrigin(.5);
+      this.add.rectangle(panelX,226,panelW,82,0x6a3414,.97).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
+      this.add.text(panelX+18,240,'★  ĐIỂM',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
+      this.refs.basketScore=this.add.text(panelX+79,282,String(o.score??0),{...labelStyle(34,'#ffd844'),strokeThickness:2}).setOrigin(.5);
+
+      // top board with question
+      this.add.rectangle(185,13,760,122,0x9b6a25,1).setOrigin(0).setStrokeStyle(4,0x5b3b12,1);
+      this.add.rectangle(192,20,746,108,0xfff8c9,1).setOrigin(0).setStrokeStyle(2,0xd8bc67,1);
+      this.add.text(215,31,`CÂU ${o.question||1}/${o.total||10}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#b15c17'});
+      const qRaw=String(o.questionText||'');
+      const qFs=qRaw.length>155?16:qRaw.length>105?19:24;
+      const qText=this.add.text(215,55,qRaw,{fontFamily:'Arial',fontSize:`${qFs}px`,fontStyle:'bold',color:'#1e2730',wordWrap:{width:690,useAdvancedWrap:true},lineSpacing:4});
+      qText.setOrigin(0,0);
+
       // board and hoop
-      this.add.rectangle(800,165,125,88,0xf4fbff,.93).setStrokeStyle(5,0x54636f,1);this.add.rectangle(800,173,54,40,0xffffff,0).setStrokeStyle(3,0xd95c45,1);
-      const rim=this.add.ellipse(800,223,78,20,0xd95c45,0).setStrokeStyle(7,0xd95c45,1); this.refs.rim=rim;
-      const ng=this.add.graphics();ng.lineStyle(2,0xffffff,.75);for(let i=-28;i<=28;i+=14){ng.beginPath();ng.moveTo(800+i,230);ng.lineTo(800+i*.55,284);ng.strokePath()}ng.lineStyle(2,0xffffff,.55);[244,258,272].forEach(y=>{ng.beginPath();ng.moveTo(775,y);ng.lineTo(825,y);ng.strokePath()});
-      this.refs.player=this.createPlayer(230,404,0x8d4fc5,1.13); const ball=this.add.image(330,358,'basketBall').setScale(.72);this.refs.ball=ball;
-      this.add.text(478,340,'FREE THROW',{fontFamily:'Arial',fontSize:'18px',fontStyle:'bold',color:'#ffffff66'}).setOrigin(.5);
-      this.add.rectangle(25,432,250,42,0x101b2c,.8).setOrigin(0).setStrokeStyle(1,0xffffff,.15);this.add.text(150,453,'Đúng = SWISH! 🏀',{fontFamily:'Arial',fontSize:'16px',fontStyle:'bold',color:'#fff1df'}).setOrigin(.5);
+      this.add.rectangle(793,185,132,90,0xf4fbff,.96).setStrokeStyle(5,0x54636f,1);
+      this.add.rectangle(793,193,58,42,0xffffff,0).setStrokeStyle(3,0xd95c45,1);
+      const rim=this.add.ellipse(793,243,82,20,0xd95c45,0).setStrokeStyle(7,0xd95c45,1); this.refs.rim=rim;
+      const ng=this.add.graphics(); ng.lineStyle(2,0xffffff,.78);
+      for(let i=-30;i<=30;i+=15){ ng.beginPath(); ng.moveTo(793+i,250); ng.lineTo(793+i*.55,304); ng.strokePath(); }
+      ng.lineStyle(2,0xffffff,.55); [263,278,292].forEach(y=>{ ng.beginPath(); ng.moveTo(767,y); ng.lineTo(819,y); ng.strokePath(); });
+      this.refs.player=this.createPlayer(255,396,0x8d4fc5,1.13);
+      const ball=this.add.image(345,402,'basketBall').setScale(.72).setDepth(8); this.refs.ball=ball;
+      this.add.ellipse(345,420,90,15,0x7b4f29,.25).setDepth(7);
+      this.add.text(793,325,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ NÉM',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#fff1df'}).setOrigin(.5);
+
+      // answer panels on the court
+      const options=(o.options||[]).slice(0,4); this.refs.basketButtons=[];
+      const positions=[[365,332],[760,332],[365,408],[760,408]];
+      options.forEach((txt,i)=>{
+        const [x,y]=positions[i]; const c=this.add.container(x,y).setDepth(10);
+        const bg=this.add.rectangle(0,0,350,56,0xfff9d7,1).setStrokeStyle(4,0x8b6328,1);
+        const badge=this.add.circle(-145,0,22,0xb75e18,1).setStrokeStyle(3,0xffffff,1);
+        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+        const fs=String(txt).length>36?16:String(txt).length>24?18:21;
+        const t=this.add.text(-112,0,String(txt),{fontFamily:'Arial',fontSize:`${fs}px`,fontStyle:'bold',color:'#202832',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
+        c.add([bg,badge,letter,t]);
+        bg.setInteractive({useHandCursor:true});
+        bg.on('pointerover',()=>{ if(!this.refs.basketLocked){ bg.setFillStyle(0xffef9f,1); c.setScale(1.018); } });
+        bg.on('pointerout',()=>{ if(!this.refs.basketLocked){ bg.setFillStyle(0xfff9d7,1); c.setScale(1); } });
+        bg.on('pointerdown',()=>this.chooseBasketballAnswer(i));
+        this.refs.basketButtons.push({c,bg,badge,letter,t});
+      });
     }
+    chooseBasketballAnswer(i){
+      if(this.refs.basketLocked) return;
+      this.refs.basketLocked=true;
+      (this.refs.basketButtons||[]).forEach((b,idx)=>{ b.bg.disableInteractive(); b.c.setScale(idx===i?1.03:1); b.bg.setFillStyle(idx===i?0xffd36b:0xf3edcf,1); b.badge.setFillStyle(idx===i?0xd56c1c:0x8a8e95,1); });
+      if(this.refs.onBasketAnswer) this.refs.onBasketAnswer(String(i));
+    }
+    lockBasketballAnswers(){ this.refs.basketLocked=true; (this.refs.basketButtons||[]).forEach(b=>b.bg.disableInteractive()); }
+    unlockBasketballAnswers(){ this.refs.basketLocked=false; (this.refs.basketButtons||[]).forEach(b=>{ b.bg.setInteractive({useHandCursor:true}); b.bg.setFillStyle(0xfff9d7,1); b.c.setScale(1); b.badge.setFillStyle(0xb75e18,1); }); }
+    updateBasketballTimer(sec){ if(this.refs.basketTimer){ this.refs.basketTimer.setText(this.formatSoccerTime(sec)); this.refs.basketTimer.setColor(sec<=30?'#ff8b92':'#ffd844'); } }
+    updateBasketballScore(v){ if(this.refs.basketScore) this.refs.basketScore.setText(String(v)); }
+    updateBeeTimer(sec){ if(this.refs.beeTimer){ this.refs.beeTimer.setText(this.formatSoccerTime(sec)); this.refs.beeTimer.setColor(sec<=60?'#ff8b92':'#ffd844'); } }
+    updateBeeScore(v){ if(this.refs.beeScore) this.refs.beeScore.setText(String(v)); }
     basketballOutcome(ok){
-      return new Promise(resolve=>{const ball=this.refs.ball;if(!ball){resolve();return;}const start=new Phaser.Math.Vector2(ball.x,ball.y),control=new Phaser.Math.Vector2(565,75),end=ok?new Phaser.Math.Vector2(800,235):new Phaser.Math.Vector2(835,212);const curve=new Phaser.Curves.QuadraticBezier(start,control,end);const state={t:0};
+      return new Promise(resolve=>{
+        const ball=this.refs.ball;
+        if(!ball){ resolve(); return; }
+        const start=new Phaser.Math.Vector2(ball.x,ball.y), control=new Phaser.Math.Vector2(565,115), end=ok?new Phaser.Math.Vector2(793,255):new Phaser.Math.Vector2(830,232);
+        const curve=new Phaser.Curves.QuadraticBezier(start,control,end); const state={t:0};
         this.tweens.add({targets:this.refs.player,rotation:-.12,duration:180,yoyo:true});
-        this.tweens.add({targets:state,t:1,duration:980,ease:'Sine.inOut',onUpdate:()=>{const p=curve.getPoint(state.t);ball.setPosition(p.x,p.y);ball.angle+=18;},onComplete:()=>{
-          if(ok){this.tweens.add({targets:ball,y:320,scale:.55,duration:330,ease:'Quad.in',onComplete:()=>{this.popMessage('SWISH! +10','#fff4df',C.orange);for(let i=0;i<12;i++){const s=this.add.image(800,235,'spark').setTint(0xffc54d).setScale(.35);this.tweens.add({targets:s,x:760+Math.random()*80,y:200+Math.random()*90,alpha:0,duration:650,onComplete:()=>s.destroy()});}this.time.delayedCall(600,resolve);}});}
-          else{this.tweens.add({targets:ball,x:750,y:365,angle:ball.angle+360,duration:520,ease:'Bounce.out'});this.tweens.add({targets:this.refs.rim,scaleX:1.08,duration:90,yoyo:true,repeat:2});this.popMessage('BẬT VÀNH!','#ffe4e4',C.red);this.time.delayedCall(850,resolve);}
+        this.tweens.add({targets:state,t:1,duration:980,ease:'Sine.inOut',onUpdate:()=>{ const p=curve.getPoint(state.t); ball.setPosition(p.x,p.y); ball.angle+=18; },onComplete:()=>{
+          if(ok){
+            this.tweens.add({targets:ball,y:325,scale:.55,duration:330,ease:'Quad.in',onComplete:()=>{ this.popMessage('SWISH! +10','#fff4df',C.orange); for(let i=0;i<12;i++){ const s=this.add.image(793,255,'spark').setTint(0xffc54d).setScale(.35); this.tweens.add({targets:s,x:755+Math.random()*76,y:225+Math.random()*90,alpha:0,duration:650,onComplete:()=>s.destroy()}); } this.time.delayedCall(600,resolve); }});
+          }else{
+            this.tweens.add({targets:ball,x:742,y:390,angle:ball.angle+360,duration:520,ease:'Bounce.out'}); this.tweens.add({targets:this.refs.rim,scaleX:1.08,duration:90,yoyo:true,repeat:2}); this.popMessage('BẬT VÀNH!','#ffe4e4',C.red); this.time.delayedCall(850,resolve);
+          }
         }});
       });
     }
     showRacing(o={}){
+
       this.clearScene();this.mode='racing';this.addSky(0x75cff4,0xc5efff);this.drawHills();this.addHeader('LÁI XE VƯỢT CHƯỚNG NGẠI','4 ý Đúng/Sai • Tối đa 50 điểm/câu • 10 phút/câu',C.cyan);
       // trees
       const scenery=this.add.graphics();for(let i=0;i<12;i++){const x=35+i*84,y=300+(i%3)*16;scenery.fillStyle(0x81522f,1);scenery.fillRect(x-4,y,8,38);scenery.fillStyle(0x2c8b49,1);scenery.fillCircle(x,y-8,24);scenery.fillCircle(x-15,y,16);scenery.fillCircle(x+15,y,16)}
@@ -496,13 +591,19 @@ beeOutcome(ok,dir,blockedCount){
   function showSoccer(opts){withScene(s=>s.showSoccer(opts));}
   function updateSoccerTimer(sec){withScene(s=>s.updateSoccerTimer(sec));}
   function updateSoccerScore(v){withScene(s=>s.updateSoccerScore(v));}
+  function updateBeeTimer(sec){withScene(s=>s.updateBeeTimer(sec));}
+  function updateBeeScore(v){withScene(s=>s.updateBeeScore(v));}
   function lockSoccerAnswers(){withScene(s=>s.lockSoccerAnswers());}
   function unlockSoccerAnswers(){withScene(s=>s.unlockSoccerAnswers());}
   function showBasketball(opts){withScene(s=>s.showBasketball(opts));}
+  function updateBasketballTimer(sec){withScene(s=>s.updateBasketballTimer(sec));}
+  function updateBasketballScore(v){withScene(s=>s.updateBasketballScore(v));}
+  function lockBasketballAnswers(){withScene(s=>s.lockBasketballAnswers());}
+  function unlockBasketballAnswers(){withScene(s=>s.unlockBasketballAnswers());}
   function showRacing(opts){withScene(s=>s.showRacing(opts));}
   function outcome(type,ok,extra={}){return new Promise(resolve=>withScene(s=>{let p;if(type==='bee')p=s.beeOutcome(ok,extra.direction,extra.blockedCount||0);else if(type==='soccer')p=s.soccerOutcome(ok);else if(type==='basketball')p=s.basketballOutcome(ok);else p=s.racingOutcome(extra.points||0);Promise.resolve(p).then(resolve);}));}
   function selectDirection(dir){withScene(s=>s.selectDirection(dir));}
   function destroy(){if(game){game.destroy(true);game=null;scene=null;ready=false;}}
 
-  window.ChemGames={ready:true,ensure,showBee,showSoccer,updateSoccerTimer,updateSoccerScore,lockSoccerAnswers,unlockSoccerAnswers,showBasketball,showRacing,outcome,selectDirection,destroy};
+  window.ChemGames={ready:true,ensure,showBee,showSoccer,updateSoccerTimer,updateSoccerScore,updateBeeTimer,updateBeeScore,lockSoccerAnswers,unlockSoccerAnswers,showBasketball,updateBasketballTimer,updateBasketballScore,lockBasketballAnswers,unlockBasketballAnswers,showRacing,outcome,selectDirection,destroy};
 })();
