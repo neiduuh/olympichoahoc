@@ -1,58 +1,253 @@
 {% extends "base.html" %}{% block content %}
-<div class="game-shell chemistry-arena">
-  <div class="game-header">
-    <div>
+<div class="game-shell phaser-shell">
+  <div class="game-topbar">
+    <div class="game-title-wrap">
+      <div class="game-kicker">OLYMPIC HÓA HỌC</div>
       <h1>{{r.title}}</h1>
-      <div class="anticheat">⚠️ Chuyển tab/cửa sổ sẽ được ghi nhận là vi phạm.</div>
+      <div class="anticheat">⚠️ Hệ thống ghi nhận khi thí sinh chuyển tab hoặc rời cửa sổ thi.</div>
     </div>
-    <div class="hud"><span class="score">Điểm: <b id="score">0</b></span><span>⏱ <b id="clock">00:00</b></span></div>
+    <div class="pro-hud">
+      <div class="hud-chip"><span>Điểm</span><strong id="score">0</strong></div>
+      <div class="hud-chip"><span>Thời gian</span><strong id="clock">00:00</strong></div>
+      <div class="hud-chip danger-chip"><span>Vi phạm</span><strong id="violationCount">0</strong></div>
+    </div>
   </div>
-  <div class="progress"><div id="prog"></div></div>
-  <div id="root"></div>
+
+  <div class="game-progress-wrap">
+    <div class="game-progress-meta"><span id="gameStepText">Chuẩn bị</span><span id="questionStepText">0/0 câu</span></div>
+    <div class="game-progress"><div id="prog"></div></div>
+  </div>
+
+  <div class="phase-tabs" id="phaseTabs" aria-label="Các mini game trong vòng thi"></div>
+
+  <div class="phaser-frame">
+    <div id="phaser-stage" aria-label="Khu vực mini game Phaser"></div>
+    <div id="phaserFallback" class="phaser-fallback" hidden>
+      Không tải được bộ máy đồ họa Phaser. Hãy kiểm tra kết nối mạng và tải lại trang.
+    </div>
+  </div>
+
+  <div id="questionRoot"></div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+<script src="{{url_for('static',filename='js/phaser-games.js')}}"></script>
 <script>
 const grouped={{grouped|tojson}};
 const attemptId={{attempt_id}}, roundId={{r.id}};
 const sport=(grouped.soccer||[]).length ? 'soccer' : ((grouped.basketball||[]).length ? 'basketball' : null);
-const games=[['bee','🐝 Ong tìm mật'], ...(sport?[[sport,sport==='soccer'?'⚽ Sút bóng vào lưới':'🏀 Ném bóng vào rổ']]:[]), ['racing','🏍️ Lái xe vượt chướng ngại vật']]
-  .filter(x=>(grouped[x[0]]||[]).length);
+const games=[
+  ['bee','Ong tìm mật','🐝'],
+  ...(sport?[[sport,sport==='soccer'?'Sút bóng vào lưới':'Ném bóng vào rổ',sport==='soccer'?'⚽':'🏀']]:[]),
+  ['racing','Lái xe vượt chướng ngại vật','🏍️']
+].filter(x=>(grouped[x[0]]||[]).length);
+
 let gi=0, qi=0, score=0, violations=0, started=Date.now(), detail=[];
-let questionDeadline=null, timerHandle=null, locked=false, beeStep=0, beeBlockedDirs=new Set(), beeChosenDir=null;
-const root=document.getElementById('root');
+let questionDeadline=null, timerHandle=null, locked=false;
+let beeStep=0, beeBlockedDirs=new Set(), beeChosenDir=null, beeStartedAt=null;
+let raceProgress=0;
+const questionRoot=document.getElementById('questionRoot');
+const scoreEl=document.getElementById('score');
+const violationEl=document.getElementById('violationCount');
+
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function fmt(sec){sec=Math.max(0,Math.floor(sec));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
 function updateGlobalClock(){document.getElementById('clock').textContent=fmt((Date.now()-started)/1000)}
 setInterval(updateGlobalClock,1000); updateGlobalClock();
-document.addEventListener('visibilitychange',()=>{if(document.hidden){violations++;fetch('/api/violation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId})});}});
+
+if(!window.ChemGames || !window.Phaser){
+  document.getElementById('phaserFallback').hidden=false;
+}else{
+  window.ChemGames.ensure();
+}
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    violations++;
+    violationEl.textContent=violations;
+    fetch('/api/violation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId})}).catch(()=>{});
+  }
+});
+
 function totalQuestions(){return games.reduce((s,x)=>s+grouped[x[0]].length,0)}
 function doneQuestions(){return games.slice(0,gi).reduce((s,x)=>s+grouped[x[0]].length,0)+qi}
-function setProgress(){document.getElementById('prog').style.width=(totalQuestions()?doneQuestions()/totalQuestions()*100:100)+'%'}
-function startQuestionTimer(seconds){clearInterval(timerHandle); questionDeadline=Date.now()+seconds*1000; const el=document.getElementById('qtime'); if(!el)return; const tick=()=>{const left=Math.ceil((questionDeadline-Date.now())/1000);el.textContent=fmt(left); if(left<=0){clearInterval(timerHandle); timeoutQuestion();}};tick();timerHandle=setInterval(tick,500)}
-function timeoutQuestion(){if(locked)return;locked=true;const g=games[gi]?.[0];const q=grouped[g]?.[qi];if(!q)return;document.getElementById('feedback').innerHTML='⏰ <b>Hết thời gian.</b> Câu này không được tính điểm.';detail.push({q:q.id,score:0,timeout:true,game:g});playOutcome(g,false,0);setTimeout(nextQuestion,1500)}
-function nextQuestion(){clearInterval(timerHandle);locked=false;qi++;beeChosenDir=null;render()}
-function render(){clearInterval(timerHandle);locked=false;if(gi>=games.length){finish();return}const [g]=games[gi],arr=grouped[g];if(qi>=arr.length){gi++;qi=0;beeStep=0;beeBlockedDirs=new Set();beeChosenDir=null;render();return}setProgress(); if(g==='bee')renderBee(arr[qi],arr.length); else if(g==='soccer')renderSoccer(arr[qi],arr.length); else if(g==='basketball')renderBasketball(arr[qi],arr.length); else renderRacing(arr[qi],arr.length)}
-function commonQuestion(q,title,body,extra=''){return `<div class="question-panel"><div class="question-top"><span class="badge">${title}</span><span class="round-timer">Còn lại <b id="qtime">--:--</b></span></div><h3>${esc(q.content)}</h3>${body}<div id="feedback" class="game-feedback" aria-live="polite"></div>${extra}</div>`}
-function shortInput(){return `<div class="answer-row"><input id="ans" autocomplete="off" placeholder="Nhập câu trả lời ngắn"><button class="btn" id="shortSubmit">Trả lời</button></div>`}
-function mcq(q){return `<div class="options game-options">${q.options.map((x,i)=>`<button type="button" class="option" data-answer="${i}"><b>${'ABCD'[i]}.</b> ${esc(x)}</button>`).join('')}</div>`}
-function tf4(q){return `<div class="tf-grid">${q.options.map((x,i)=>`<div class="tf-item"><div><b>${String.fromCharCode(97+i)})</b> ${esc(x)}</div><div class="tf-buttons"><button type="button" data-tf="${i}" data-val="true">Đúng</button><button type="button" data-tf="${i}" data-val="false">Sai</button></div></div>`).join('')}</div><button class="btn" id="tfSubmit">Chốt đáp án</button>`}
-function bindAnswers(q,g){if(q.qtype==='short'){const btn=document.getElementById('shortSubmit'),inp=document.getElementById('ans');btn.addEventListener('click',()=>submitAns(inp.value));inp.addEventListener('keydown',e=>{if(e.key==='Enter')submitAns(inp.value)});inp.focus()}else if(q.qtype==='mcq'){document.querySelectorAll('[data-answer]').forEach(b=>b.addEventListener('click',()=>submitAns(b.dataset.answer)))}else{const vals=[null,null,null,null];document.querySelectorAll('[data-tf]').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.tf;vals[i]=b.dataset.val==='true';document.querySelectorAll(`[data-tf="${i}"]`).forEach(x=>x.classList.toggle('selected',x===b))}));document.getElementById('tfSubmit').addEventListener('click',()=>{if(vals.some(v=>v===null)){document.getElementById('feedback').textContent='Hãy chọn Đúng/Sai cho đủ 4 ý.';return}submitAns(vals)})}}
-function renderBee(q,n){
- const visualStep=Math.min(6,Math.round((beeStep/Math.max(1,n))*6));
- const pathCells=Array.from({length:7},(_,i)=>`<div class="bee-node ${i<visualStep?'passed':''} ${i===visualStep?'current':''}" style="left:${8+i*13.5}%;top:${i%2?48:30}%">${i===0?'🌼':i===6?'🍯':(i<=visualStep?'✨':'🪨')}</div>`).join('');
- root.innerHTML=`<section class="mini-intro"><div><b>🐝 Ong tìm mật</b><span>Chọn một hướng chưa bị chặn rồi trả lời câu hỏi. Sai: khóa hướng đó. Đúng: ong vượt chướng ngại vật và sang nút tiếp theo.</span></div><span>Câu ${qi+1}/${n}</span></section><div class="bee-world"><div class="cloud c1">☁️</div><div class="cloud c2">☁️</div><div class="bee-map">${pathCells}<div class="bee-avatar" id="beeAvatar" style="left:${8+visualStep*13.5}%;top:${visualStep%2?40:22}%">🐝</div></div><div class="direction-pad"><button type="button" data-dir="up" ${beeBlockedDirs.has('up')?'disabled':''}>${beeBlockedDirs.has('up')?'⛔':'↑'}</button><div><button type="button" data-dir="left" ${beeBlockedDirs.has('left')?'disabled':''}>${beeBlockedDirs.has('left')?'⛔':'←'}</button><button type="button" data-dir="right" ${beeBlockedDirs.has('right')?'disabled':''}>${beeBlockedDirs.has('right')?'⛔':'→'}</button></div><button type="button" data-dir="down" ${beeBlockedDirs.has('down')?'disabled':''}>${beeBlockedDirs.has('down')?'⛔':'↓'}</button><small>Chọn hướng</small></div></div>${commonQuestion(q,'Chướng ngại '+(qi+1),shortInput(),`<div class="road-status">Hướng bị chặn: <b id="blockedCount">${beeBlockedDirs.size}</b>/4</div>`)} `;
- document.getElementById('shortSubmit').disabled=true;
- document.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>{if(b.disabled)return;beeChosenDir=b.dataset.dir;document.querySelectorAll('[data-dir]').forEach(x=>x.classList.toggle('chosen',x===b));document.getElementById('shortSubmit').disabled=false;document.getElementById('ans').focus()}));
- bindAnswers(q,'bee');
- // bindAnswers bật lại nút sau khi gắn sự kiện; khóa cho đến khi người chơi chọn hướng.
- document.getElementById('shortSubmit').disabled=!beeChosenDir;
- startQuestionTimer(Math.max(1,1200-Math.floor((Date.now()-started)/1000)));
+function setProgress(){
+  const total=totalQuestions(),done=doneQuestions();
+  document.getElementById('prog').style.width=(total?done/total*100:100)+'%';
+  document.getElementById('questionStepText').textContent=`${Math.min(done+1,total)}/${total} câu`;
+  document.getElementById('gameStepText').textContent=gi<games.length?`Mini game ${gi+1}/${games.length}: ${games[gi][1]}`:'Hoàn thành';
 }
-function renderSoccer(q,n){root.innerHTML=`<section class="mini-intro"><div><b>⚽ Sút bóng vào lưới</b><span>Đúng: ghi bàn. Sai: thủ môn cản phá hoặc bóng đi ra ngoài.</span></div><span>Câu ${qi+1}/${n}</span></section><div class="soccer-field"><div class="stadium">OLYMPIC HÓA HỌC</div><div class="goal"><div class="keeper" id="keeper">🧤</div></div><div class="football-player">🏃</div><div class="football" id="football">⚽</div><div class="spot"></div></div>${commonQuestion(q,'Câu '+(qi+1),mcq(q))}`;bindAnswers(q,'soccer');startQuestionTimer(120)}
-function renderBasketball(q,n){root.innerHTML=`<section class="mini-intro"><div><b>🏀 Ném bóng vào rổ</b><span>Đúng: bóng vào rổ. Sai: bóng bật vành hoặc ném lệch.</span></div><span>Câu ${qi+1}/${n}</span></section><div class="basket-court"><div class="backboard"></div><div class="hoop"></div><div class="basket-player">⛹️</div><div class="basket-ball" id="basketBall">🏀</div><div class="court-lines"></div></div>${commonQuestion(q,'Câu '+(qi+1),mcq(q))}`;bindAnswers(q,'basketball');startQuestionTimer(120)}
-function renderRacing(q,n){root.innerHTML=`<section class="mini-intro"><div><b>🏍️ Lái xe vượt chướng ngại vật</b><span>Đúng 1/2/3/4 ý: 5/15/25/50 điểm. Mỗi câu tối đa 10 phút.</span></div><span>Câu ${qi+1}/${n}</span></section><div class="race-world"><div class="mountains">⛰️　⛰️　⛰️</div><div class="road"><div class="lane"></div><div class="bike" id="bike" style="left:${8+qi*35}%">🏍️</div><div class="barrier">🚧</div><div class="finishflag">🏁</div></div></div>${commonQuestion(q,'Trạm '+(qi+1),tf4(q))}`;bindAnswers(q,'racing');startQuestionTimer(600)}
-async function submitAns(ans){if(locked)return;const currentGame=games[gi]?.[0];if(currentGame==='bee'&&!beeChosenDir){document.getElementById('feedback').textContent='Hãy chọn một hướng bay trước khi trả lời.';return}locked=true;clearInterval(timerHandle);const g=games[gi][0],q=grouped[g][qi];document.querySelectorAll('button,input,select').forEach(el=>{if(root.contains(el))el.disabled=true});const res=await fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,question_id:q.id,answer:ans})});const d=await res.json();score+=d.score;document.getElementById('score').textContent=score;detail.push({q:q.id,score:d.score,ok:d.ok,game:g});const fb=document.getElementById('feedback');fb.innerHTML=(d.ok?'✅ <b>Chính xác!</b> ':'❌ <b>Chưa chính xác.</b> ')+esc(d.explanation||'')+(g==='racing'?` <strong>+${d.score} điểm</strong>`:'');playOutcome(g,d.ok,d.score);setTimeout(nextQuestion,g==='racing'?1800:1500)}
-function playOutcome(g,ok,pts){if(g==='bee'){const bee=document.getElementById('beeAvatar');if(ok){beeStep++;beeBlockedDirs=new Set();bee?.classList.add('bee-fly');}else{if(beeChosenDir)beeBlockedDirs.add(beeChosenDir);document.getElementById('blockedCount').textContent=beeBlockedDirs.size;bee?.classList.add('bee-bump');if(beeBlockedDirs.size>=4){document.getElementById('feedback').innerHTML+=' <b>🚫 Cả 4 hướng đã bị khóa — Ong tìm mật kết thúc.</b>';qi=grouped.bee.length-1;}}}else if(g==='soccer'){const ball=document.getElementById('football'),keeper=document.getElementById('keeper');if(ok)ball?.classList.add('goal-shot');else{ball?.classList.add(Math.random()>.5?'saved-shot':'miss-shot');keeper?.classList.add('keeper-save')}}else if(g==='basketball'){document.getElementById('basketBall')?.classList.add(ok?'swish-shot':'rim-miss')}else if(g==='racing'){const bike=document.getElementById('bike');const advance=pts>=50?58:pts>=25?42:pts>=15?28:pts>=5?18:8;bike.style.transform=`translateX(${advance}vw)`;bike.classList.add('bike-go')}}
-async function finish(){clearInterval(timerHandle);setProgress();const elapsed=Math.floor((Date.now()-started)/1000);const res=await fetch('/api/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,round_id:roundId,score,elapsed,violations,detail,selected_sport:sport})});const d=await res.json();const sportName=sport==='soccer'?'Sút bóng vào lưới':sport==='basketball'?'Ném bóng vào rổ':'Không có';root.innerHTML=`<div class="finish-card"><div class="finish-cup">🏆</div><h2>Hoàn thành vòng thi!</h2><p>Game thể thao lượt này: <b>${sportName}</b></p><div class="finish-score">${score} điểm</div><p>Thời gian: <b>${fmt(elapsed)}</b> · Vi phạm chuyển tab: <b>${violations}</b></p><a class="btn" href="${d.redirect}">Xem bảng xếp hạng</a></div>`;document.getElementById('prog').style.width='100%'}
+function renderPhaseTabs(){
+  const box=document.getElementById('phaseTabs');
+  box.innerHTML=games.map((g,i)=>`<div class="phase-tab ${i<gi?'done':''} ${i===gi?'active':''}"><span class="phase-number">${i<gi?'✓':i+1}</span><span>${g[2]} ${g[1]}</span></div>`).join('');
+}
+function startQuestionTimer(seconds){
+  clearInterval(timerHandle);
+  questionDeadline=Date.now()+Math.max(1,seconds)*1000;
+  const el=document.getElementById('qtime'); if(!el)return;
+  const tick=()=>{
+    const left=Math.ceil((questionDeadline-Date.now())/1000);
+    el.textContent=fmt(left);
+    el.closest('.question-timer')?.classList.toggle('urgent',left<=30);
+    if(left<=0){clearInterval(timerHandle);timeoutQuestion();}
+  };
+  tick(); timerHandle=setInterval(tick,400);
+}
+function timeoutQuestion(){
+  if(locked)return; locked=true;
+  const g=games[gi]?.[0],q=grouped[g]?.[qi]; if(!q)return;
+  const fb=document.getElementById('feedback');
+  if(fb)fb.innerHTML='<span class="result-badge bad">HẾT GIỜ</span> Câu này không được tính điểm.';
+  detail.push({q:q.id,score:0,timeout:true,game:g});
+  disableQuestionControls();
+  if(g==='bee'){
+    qi=grouped.bee.length;
+    setTimeout(()=>render(),900);
+  }else{
+    window.ChemGames?.outcome(g,false,{points:0,direction:beeChosenDir,blockedCount:beeBlockedDirs.size}).then(nextQuestion);
+  }
+}
+function disableQuestionControls(){questionRoot.querySelectorAll('button,input,select').forEach(el=>el.disabled=true)}
+function nextQuestion(){clearInterval(timerHandle);locked=false;qi++;beeChosenDir=null;render()}
+
+function render(){
+  clearInterval(timerHandle);locked=false;
+  if(gi>=games.length){finish();return}
+  const [g]=games[gi],arr=grouped[g];
+  if(qi>=arr.length){gi++;qi=0;beeChosenDir=null;render();return}
+  setProgress();renderPhaseTabs();
+  const q=arr[qi];
+  if(g==='bee')renderBee(q,arr.length);
+  else if(g==='soccer')renderSoccer(q,arr.length);
+  else if(g==='basketball')renderBasketball(q,arr.length);
+  else renderRacing(q,arr.length);
+}
+
+function questionCard(q,title,body,hint=''){
+  return `<section class="pro-question-card">
+    <div class="question-card-top">
+      <div><div class="question-label">${title}</div>${hint?`<div class="question-hint">${hint}</div>`:''}</div>
+      <div class="question-timer"><span>Thời gian còn lại</span><strong id="qtime">--:--</strong></div>
+    </div>
+    <div class="question-text">${esc(q.content)}</div>
+    ${body}
+    <div id="feedback" class="pro-feedback" aria-live="polite"></div>
+  </section>`;
+}
+function shortInput(){return `<div class="short-answer-row"><input id="ans" autocomplete="off" spellcheck="false" placeholder="Nhập câu trả lời ngắn"><button class="btn answer-submit" id="shortSubmit" type="button">Trả lời</button></div>`}
+function mcq(q){return `<div class="pro-options">${q.options.map((x,i)=>`<button type="button" class="pro-option" data-answer="${i}"><span class="opt-letter">${'ABCD'[i]}</span><span>${esc(x)}</span></button>`).join('')}</div>`}
+function tf4(q){return `<div class="pro-tf-grid">${q.options.map((x,i)=>`<div class="pro-tf-item"><div class="tf-statement"><span>${String.fromCharCode(97+i)})</span>${esc(x)}</div><div class="tf-choice"><button type="button" data-tf="${i}" data-val="true">Đúng</button><button type="button" data-tf="${i}" data-val="false">Sai</button></div></div>`).join('')}</div><button class="btn answer-submit" id="tfSubmit" type="button">Chốt 4 ý</button>`}
+
+function bindAnswers(q){
+  if(q.qtype==='short'){
+    const btn=document.getElementById('shortSubmit'),inp=document.getElementById('ans');
+    btn.addEventListener('click',()=>submitAns(inp.value));
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')submitAns(inp.value)});
+    inp.focus();
+  }else if(q.qtype==='mcq'){
+    document.querySelectorAll('[data-answer]').forEach(b=>b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-answer]').forEach(x=>x.classList.toggle('selected',x===b));
+      submitAns(b.dataset.answer);
+    }));
+  }else{
+    const vals=[null,null,null,null];
+    document.querySelectorAll('[data-tf]').forEach(b=>b.addEventListener('click',()=>{
+      const i=+b.dataset.tf; vals[i]=b.dataset.val==='true';
+      document.querySelectorAll(`[data-tf="${i}"]`).forEach(x=>x.classList.toggle('selected',x===b));
+    }));
+    document.getElementById('tfSubmit').addEventListener('click',()=>{
+      if(vals.some(v=>v===null)){document.getElementById('feedback').innerHTML='<span class="result-badge warn">CHƯA ĐỦ</span> Hãy chọn Đúng/Sai cho cả 4 ý.';return}
+      submitAns(vals);
+    });
+  }
+}
+
+function renderBee(q,n){
+  if(beeStartedAt===null)beeStartedAt=Date.now();
+  window.ChemGames?.showBee({
+    step:Math.min(6,Math.round((beeStep/Math.max(1,n))*6)),
+    blocked:[...beeBlockedDirs], selected:beeChosenDir,
+    onDirection:(dir)=>{
+      beeChosenDir=dir;
+      window.ChemGames?.selectDirection(dir);
+      const btn=document.getElementById('shortSubmit'); if(btn)btn.disabled=false;
+      const help=document.getElementById('beeHelp'); if(help)help.textContent=`Đã chọn hướng ${dir==='up'?'↑':dir==='down'?'↓':dir==='left'?'←':'→'}. Bây giờ hãy trả lời câu hỏi.`;
+      document.getElementById('ans')?.focus();
+    }
+  });
+  questionRoot.innerHTML=questionCard(q,`Chướng ngại ${qi+1}/${n}`,shortInput(),'<span id="beeHelp">Hãy chọn một hướng trên bản đồ game trước khi trả lời.</span>');
+  bindAnswers(q); document.getElementById('shortSubmit').disabled=!beeChosenDir;
+  const remaining=1200-Math.floor((Date.now()-beeStartedAt)/1000); startQuestionTimer(remaining);
+}
+function renderSoccer(q,n){
+  window.ChemGames?.showSoccer({question:qi+1,total:n});
+  questionRoot.innerHTML=questionCard(q,`Cú sút ${qi+1}/${n}`,mcq(q),'Trả lời đúng để ghi bàn. Mỗi câu có tối đa 2 phút.');
+  bindAnswers(q);startQuestionTimer(120);
+}
+function renderBasketball(q,n){
+  window.ChemGames?.showBasketball({question:qi+1,total:n});
+  questionRoot.innerHTML=questionCard(q,`Lượt ném ${qi+1}/${n}`,mcq(q),'Trả lời đúng để bóng vào rổ. Mỗi câu có tối đa 2 phút.');
+  bindAnswers(q);startQuestionTimer(120);
+}
+function renderRacing(q,n){
+  window.ChemGames?.showRacing({question:qi+1,total:n,progress:raceProgress});
+  questionRoot.innerHTML=questionCard(q,`Trạm vượt chướng ngại ${qi+1}/${n}`,tf4(q),'Đúng 1/2/3/4 ý tương ứng 5/15/25/50 điểm.');
+  bindAnswers(q);startQuestionTimer(600);
+}
+
+async function submitAns(ans){
+  if(locked)return;
+  const g=games[gi][0],q=grouped[g][qi];
+  if(g==='bee'&&!beeChosenDir){document.getElementById('feedback').innerHTML='<span class="result-badge warn">CHỌN HƯỚNG</span> Hãy chọn hướng bay trên bản đồ trước.';return}
+  locked=true;clearInterval(timerHandle);disableQuestionControls();
+  try{
+    const res=await fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,question_id:q.id,answer:ans})});
+    if(!res.ok)throw new Error('Không thể chấm câu trả lời');
+    const d=await res.json();
+    score=Number.isFinite(+d.total_score)?+d.total_score:score+(+d.score||0); scoreEl.textContent=score;
+    detail.push({q:q.id,score:d.score,ok:d.ok,game:g,duplicate:!!d.duplicate});
+    const fb=document.getElementById('feedback');
+    fb.innerHTML=(d.ok?'<span class="result-badge good">CHÍNH XÁC</span>':'<span class="result-badge bad">CHƯA ĐÚNG</span>')+
+      (d.explanation?` <span>${esc(d.explanation)}</span>`:'')+(g==='racing'?` <strong>+${d.score} điểm</strong>`:'');
+
+    let blockedCount=beeBlockedDirs.size;
+    if(g==='bee'){
+      if(d.ok){beeStep++;beeBlockedDirs=new Set();}
+      else if(beeChosenDir){beeBlockedDirs.add(beeChosenDir);blockedCount=beeBlockedDirs.size;}
+    }
+    if(g==='racing'){
+      const add=d.score>=50?42:d.score>=25?28:d.score>=15?18:d.score>=5?10:0;
+      raceProgress=Math.min(100,raceProgress+add);
+    }
+    await (window.ChemGames?.outcome(g,d.ok,{direction:beeChosenDir,blockedCount,points:+d.score||0}) || Promise.resolve());
+    if(g==='bee'&&beeBlockedDirs.size>=4){
+      fb.innerHTML+=' <strong> Cả 4 hướng đã bị khóa — mini game Ong tìm mật kết thúc.</strong>';
+      qi=grouped.bee.length-1;
+    }
+    nextQuestion();
+  }catch(err){
+    locked=false;
+    document.getElementById('feedback').innerHTML='<span class="result-badge bad">LỖI MẠNG</span> Không gửi được đáp án. Hãy thử lại.';
+    if(q.qtype==='short'){document.getElementById('shortSubmit').disabled=false;document.getElementById('ans').disabled=false;}
+    else if(q.qtype==='mcq'){document.querySelectorAll('[data-answer]').forEach(x=>x.disabled=false);}
+    else{document.querySelectorAll('[data-tf],#tfSubmit').forEach(x=>x.disabled=false);}
+  }
+}
+
+async function finish(){
+  clearInterval(timerHandle);renderPhaseTabs();document.getElementById('prog').style.width='100%';
+  document.getElementById('gameStepText').textContent='Đã hoàn thành vòng thi';document.getElementById('questionStepText').textContent=`${totalQuestions()}/${totalQuestions()} câu`;
+  const elapsed=Math.floor((Date.now()-started)/1000);
+  try{
+    const res=await fetch('/api/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,round_id:roundId,elapsed,violations,detail,selected_sport:sport})});
+    const d=await res.json(); score=+d.score||score;scoreEl.textContent=score;
+    const finalElapsed=Number.isFinite(+d.elapsed)?+d.elapsed:elapsed;
+    const finalViolations=Number.isFinite(+d.violations)?+d.violations:violations;
+    violations=finalViolations; violationEl.textContent=finalViolations;
+    const sportName=sport==='soccer'?'Sút bóng vào lưới':sport==='basketball'?'Ném bóng vào rổ':'Không có';
+    questionRoot.innerHTML=`<section class="pro-finish-card"><div class="finish-medal">🏆</div><div class="finish-kicker">HOÀN THÀNH VÒNG THI</div><h2>${score} điểm</h2><p>Game thể thao: <b>${sportName}</b></p><div class="finish-stats"><div><span>Thời gian</span><strong>${fmt(finalElapsed)}</strong></div><div><span>Vi phạm</span><strong>${finalViolations}</strong></div><div><span>Số câu</span><strong>${totalQuestions()}</strong></div></div><a class="btn finish-btn" href="${d.redirect}">Xem bảng xếp hạng</a></section>`;
+  }catch(err){questionRoot.innerHTML='<div class="flash danger">Không thể lưu kết quả. Vui lòng kiểm tra mạng rồi tải lại trang.</div>';}
+}
 render();
 </script>
 {% endblock %}

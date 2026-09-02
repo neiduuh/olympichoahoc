@@ -1,0 +1,48 @@
+OLYMPIC HÓA HỌC - PHASER MINI GAME V3
+
+NÂNG CẤP ĐỒ HỌA
+- Viết lại phần hiển thị 4 mini game bằng Phaser.js 3.90.0.
+- Canvas game responsive, tự co giãn theo màn hình máy tính/điện thoại.
+- Đồ họa được vẽ bằng Phaser Graphics, không còn phụ thuộc emoji làm nhân vật chính.
+- Có tween, camera shake, chuyển động quỹ đạo, hiệu ứng sao/ánh sáng và thông báo kết quả trong game.
+
+1. ONG TÌM MẬT
+- Bản đồ đồng cỏ, đường đi, tổ mật, chướng ngại vật, nút chọn 4 hướng ngay trong canvas game.
+- Ong bay theo đường khi trả lời đúng.
+- Trả lời sai: rung camera, xuất hiện đá chặn hướng.
+- 4 hướng bị khóa: kết thúc mini game.
+- Thời gian 20 phút tính cho toàn bộ mini game, không reset theo từng câu.
+
+2. SÚT BÓNG VÀO LƯỚI
+- Sân vận động, khán đài, sân cỏ, cầu thủ, thủ môn, khung thành/lưới được vẽ bằng Phaser.
+- Đúng: cầu thủ sút, bóng bay vào lưới, thủ môn đổ sai hướng, hiệu ứng GOAL.
+- Sai: ngẫu nhiên thủ môn cản phá hoặc bóng sút ra ngoài.
+- 2 phút/câu, tối đa 10 câu, 10 điểm/câu.
+
+3. NÉM BÓNG VÀO RỔ
+- Sân bóng rổ trong nhà, khán giả, cầu thủ, bảng rổ, vành và lưới.
+- Đúng: bóng bay theo đường cong vào rổ và hiệu ứng SWISH.
+- Sai: bóng chạm vành rồi bật ra.
+- 2 phút/câu, tối đa 10 câu, 10 điểm/câu.
+
+4. LÁI XE VƯỢT CHƯỚNG NGẠI VẬT
+- Đường đua phối cảnh, núi, cây, xe máy, rào chắn, cờ đích và thanh tiến độ.
+- Xe tiến xa theo điểm câu hỏi: 5 / 15 / 25 / 50.
+- Trả lời 0 điểm: xe không vượt được chướng ngại và camera rung.
+- 10 phút/câu, tối đa 2 câu.
+
+CẤU TRÚC VÒNG THI
+- Mỗi vòng luôn có Ong tìm mật + Lái xe.
+- Khi Admin tạo vòng, server bốc đúng 1 game thể thao: Sút bóng hoặc Ném rổ.
+- Kết quả bốc được lưu cố định theo vòng; mọi học sinh và mọi lần thi lại dùng cùng game thể thao.
+
+TĂNG CƯỜNG CHỐNG GIAN LẬN
+- Đáp án đúng vẫn chỉ chấm ở server, không gửi xuống trình duyệt.
+- Server tự cộng điểm từng câu; trình duyệt không còn được quyền gửi tổng điểm cuối cùng.
+- Mỗi câu chỉ được ghi điểm một lần, tránh gửi request lặp để cộng điểm nhiều lần.
+- Thời gian hoàn thành lấy theo thời gian bắt đầu/kết thúc tại server.
+- Số lần rời tab lấy từ dữ liệu server.
+
+TRIỂN KHAI
+- Không thay đổi Build Command / Start Command trên Render.
+- Phaser được tải từ CDN chính thức jsDelivr: phaser@3.90.0.

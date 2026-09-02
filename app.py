@@ -72,6 +72,23 @@ def init_db():
     for rr in con.execute("SELECT id FROM rounds WHERE selected_sport IS NULL OR selected_sport='' ").fetchall():
         con.execute("UPDATE rounds SET selected_sport=? WHERE id=?", (random.choice(["soccer","basketball"]), rr[0]))
 
+    # Điểm được cộng ở server để học sinh không thể tự sửa tổng điểm trên trình duyệt.
+    attempt_cols=[row[1] for row in con.execute("PRAGMA table_info(attempts)").fetchall()]
+    if "server_score" not in attempt_cols:
+        con.execute("ALTER TABLE attempts ADD COLUMN server_score INTEGER NOT NULL DEFAULT 0")
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS attempt_answers(
+        attempt_id INTEGER NOT NULL,
+        question_id INTEGER NOT NULL,
+        score INTEGER NOT NULL DEFAULT 0,
+        is_correct INTEGER NOT NULL DEFAULT 0,
+        answered_at TEXT NOT NULL,
+        PRIMARY KEY(attempt_id, question_id),
+        FOREIGN KEY(attempt_id) REFERENCES attempts(id),
+        FOREIGN KEY(question_id) REFERENCES questions(id)
+    )
+    """)
+
     # default admin
     admin = con.execute("SELECT id FROM users WHERE username='admin'").fetchone()
     if not admin:
@@ -246,7 +263,17 @@ def api_answer():
     con=db()
     a=con.execute("SELECT * FROM attempts WHERE id=? AND user_id=?",(aid,u["id"])).fetchone()
     q=con.execute("SELECT * FROM questions WHERE id=?",(qid,)).fetchone()
-    if not a or not q: con.close(); abort(403)
+    if not a or not q or a["finished_at"] or q["round_id"] != a["round_id"]:
+        con.close(); abort(403)
+
+    # Một câu chỉ được ghi điểm một lần. Nếu trình duyệt gửi lại request do mạng chập chờn,
+    # trả về kết quả đã ghi thay vì cộng điểm lần nữa.
+    old=con.execute("SELECT score,is_correct FROM attempt_answers WHERE attempt_id=? AND question_id=?",(aid,qid)).fetchone()
+    if old:
+        total=con.execute("SELECT server_score FROM attempts WHERE id=?",(aid,)).fetchone()["server_score"]
+        con.close()
+        return jsonify({"ok":bool(old["is_correct"]),"score":old["score"],"total_score":total,"duplicate":True,"explanation":q["explanation"] or ""})
+
     correct=json.loads(q["correct_json"])
     ans=data.get("answer")
     score=0; ok=False
@@ -263,27 +290,42 @@ def api_answer():
         n=sum(1 for i,x in enumerate(truth) if i<len(got) and got[i]==x)
         score={0:0,1:5,2:15,3:25,4:50}[n]
         ok=(n==4)
-    con.close()
-    return jsonify({"ok":ok,"score":score,"explanation":q["explanation"] or ""})
+
+    now=datetime.now().isoformat(timespec="seconds")
+    con.execute("INSERT INTO attempt_answers(attempt_id,question_id,score,is_correct,answered_at) VALUES(?,?,?,?,?)",(aid,qid,score,1 if ok else 0,now))
+    con.execute("UPDATE attempts SET server_score=server_score+? WHERE id=?",(score,aid))
+    total=con.execute("SELECT server_score FROM attempts WHERE id=?",(aid,)).fetchone()["server_score"]
+    con.commit(); con.close()
+    return jsonify({"ok":ok,"score":score,"total_score":total,"duplicate":False,"explanation":q["explanation"] or ""})
 
 @app.route("/api/finish", methods=["POST"])
 def api_finish():
     u=login_required()
     data=request.get_json(force=True)
-    aid=int(data["attempt_id"]); total=int(data.get("score",0)); elapsed=int(data.get("elapsed",0)); violations=int(data.get("violations",0))
+    aid=int(data["attempt_id"])
     con=db()
+    a=con.execute("SELECT * FROM attempts WHERE id=? AND user_id=?",(aid,u["id"])).fetchone()
+    if not a:
+        con.close(); abort(403)
+    total=int(a["server_score"] or 0)
+    # Thời gian và số lần rời tab lấy từ server, không tin số liệu tổng do trình duyệt gửi lên.
+    try:
+        elapsed=max(0,int((datetime.now()-datetime.fromisoformat(a["started_at"])).total_seconds()))
+    except Exception:
+        elapsed=max(0,int(data.get("elapsed",0)))
+    violations=int(a["violations"] or 0)
     con.execute("""UPDATE attempts SET score=?,elapsed_seconds=?,violations=?,finished_at=?,detail_json=?
                    WHERE id=? AND user_id=?""",
                 (total,elapsed,violations,datetime.now().isoformat(timespec="seconds"),
                  json.dumps(data.get("detail",{}),ensure_ascii=False),aid,u["id"]))
     con.commit(); con.close()
-    return jsonify({"redirect":url_for("leaderboard",round_id=data["round_id"])})
+    return jsonify({"redirect":url_for("leaderboard",round_id=data["round_id"]),"score":total,"elapsed":elapsed,"violations":violations})
 
 @app.route("/api/violation", methods=["POST"])
 def api_violation():
     u=login_required()
     data=request.get_json(force=True); aid=int(data["attempt_id"])
-    con=db(); con.execute("UPDATE attempts SET violations=violations+1 WHERE id=? AND user_id=?",(aid,u["id"])); con.commit(); con.close()
+    con=db(); con.execute("UPDATE attempts SET violations=violations+1 WHERE id=? AND user_id=? AND finished_at IS NULL",(aid,u["id"])); con.commit(); con.close()
     return jsonify({"ok":True})
 
 # ---------------- Admin ----------------
@@ -332,7 +374,15 @@ def admin_questions(rid):
     r=con.execute("SELECT * FROM rounds WHERE id=?",(rid,)).fetchone()
     if not r: con.close(); abort(404)
     if request.method=="POST":
-        game=request.form["game_type"]; qtype=request.form["qtype"]; content=request.form["content"].strip()
+        game=request.form["game_type"]
+        allowed_games={"bee","racing",r["selected_sport"]}
+        if game not in allowed_games:
+            con.close(); abort(400)
+        # Dạng câu hỏi được khóa theo luật từng mini game, không tin giá trị sửa tay từ trình duyệt.
+        qtype={"bee":"short","soccer":"mcq","basketball":"mcq","racing":"tf4"}[game]
+        content=request.form["content"].strip()
+        if not content:
+            con.close(); abort(400)
         options=[]
         correct=None
         points=int(request.form.get("points",10))
