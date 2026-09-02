@@ -99,7 +99,16 @@
       const c=this.add.container(x,y); const bg=this.add.rectangle(0,0,62,56,fill,.98).setStrokeStyle(2,blocked?0x85909a:0x77bddb,.85);
       const t=this.add.text(0,-2,txt,{...labelStyle(28,blocked?'#d8dde1':selected?'#142533':'#ffffff'),strokeThickness:0}).setOrigin(.5);
       c.add([bg,t]);
-      if(!blocked){ bg.setInteractive({useHandCursor:true}); bg.on('pointerover',()=>{bg.setScale(1.05);});bg.on('pointerout',()=>bg.setScale(1));bg.on('pointerdown',()=>{this.selectDirection(dir); if(this.onDirection)this.onDirection(dir);}); }
+      if(!blocked){
+        bg.setInteractive({useHandCursor:true});
+        bg.on('pointerover',()=>{if(!this.refs.beeDirectionLocked)bg.setScale(1.05);});
+        bg.on('pointerout',()=>bg.setScale(1));
+        bg.on('pointerdown',()=>{
+          if(this.refs.beeDirectionLocked)return;
+          this.selectDirection(dir);
+          if(this.onDirection)this.onDirection(dir);
+        });
+      }
       return c;
     }
     selectDirection(dir){
@@ -184,30 +193,45 @@
 
       // current bee character
       const startPt=cellCenter(current.c,current.r);
-      const bee=this.createBeeMiner(startPt.x,startPt.y,.92); this.refs.bee=bee;
+      this.refs.beeHome={x:startPt.x,y:startPt.y};
+      this.refs.beeDirectionLocked=false;
+      // Vòng sáng + nhãn để nhân vật luôn dễ nhận ra trên bàn cờ
+      const beeHalo=this.add.circle(startPt.x,startPt.y,31,0xffdf45,.22).setStrokeStyle(3,0xffef8a,.95).setDepth(28);
+      this.tweens.add({targets:beeHalo,scale:1.22,alpha:.08,duration:700,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+      this.refs.beeHalo=beeHalo;
+      const bee=this.createBeeMiner(startPt.x,startPt.y,1.18).setDepth(30); this.refs.bee=bee;
       this.tweens.add({targets:bee,y:bee.y-5,duration:620,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+      this.refs.beeLabel=this.add.text(startPt.x,startPt.y-48,'ONG',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff7b0',stroke:'#5b3b12',strokeThickness:4}).setOrigin(.5).setDepth(31);
 
       // available direction target tiles
       this.refs.blocked=o.blocked||[];
       this.refs.selectedDir=o.selected||null;
       this.refs.beeTargets={};
+      this.refs.beeTargetTiles={};
       Object.entries(dirInfo).forEach(([dir,[dx,dy,label]])=>{
         const tc=targetCells[dir];
         const valid=tc.c>=0&&tc.c<board.cols&&tc.r>=0&&tc.r<board.rows;
         const blocked=this.refs.blocked.includes(dir) || !valid;
         const pt=valid?cellCenter(tc.c,tc.r):{x:startPt.x+dx*board.cell,y:startPt.y+dy*board.cell};
         this.refs.beeTargets[dir]={x:pt.x,y:pt.y,c:tc.c,r:tc.r,valid};
-        if(!valid){
-          const rg=this.add.graphics(); rg.fillStyle(0x8d969f,1); rg.fillCircle(pt.x,pt.y,18); rg.fillStyle(0xb4bcc4,1); rg.fillCircle(pt.x-6,pt.y-4,7); rg.lineStyle(2,0x737c84,.7); rg.strokeCircle(pt.x,pt.y,18);
+        if(!valid || blocked){
+          const rock=this.add.container(pt.x,pt.y).setDepth(14);
+          const rg=this.add.graphics();
+          rg.fillStyle(0x7e878f,1); rg.fillCircle(0,1,20);
+          rg.fillStyle(0xaeb6bd,1); rg.fillCircle(-7,-6,7); rg.fillCircle(5,2,5);
+          rg.lineStyle(2,0x676f76,.9); rg.strokeCircle(0,1,20);
+          rock.add(rg);
+          this.refs.beeTargetTiles[dir]=rock;
           return;
         }
-        const tile=this.add.container(pt.x,pt.y);
-        const bgColor=blocked?0x7b2628:(o.selected===dir?0xffc547:0x9f2224);
-        const txtColor=blocked?'#ffd7d7':(o.selected===dir?'#30210a':'#ffffff');
+        const tile=this.add.container(pt.x,pt.y).setDepth(15);
+        const bgColor=o.selected===dir?0xffc547:0x9f2224;
+        const txtColor=o.selected===dir?'#30210a':'#ffffff';
         const sq=this.add.rectangle(0,0,42,42,bgColor,1).setStrokeStyle(3,0xe0b56d,.95);
-        const q=this.add.text(0,-2,blocked?'×':'?',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:txtColor}).setOrigin(.5);
+        const q=this.add.text(0,-2,'?',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:txtColor}).setOrigin(.5);
         const gem=this.add.circle(12,12,7,0x4cd0ff,1).setStrokeStyle(2,0xffffff,.8);
         tile.add([sq,q,gem]);
+        this.refs.beeTargetTiles[dir]=tile;
       });
 
       // left player info column
@@ -241,31 +265,75 @@
       this.add.text(500,464,'Mỗi lần: chọn ↑ ↓ ← → rồi trả lời đúng để Ong tiến tới ô tiếp theo. Sai sẽ khóa hướng vừa chọn.',{fontFamily:'Arial',fontSize:'13px',color:'#e8f7ff',wordWrap:{width:500}}).setOrigin(.5);
     }
 
-beeOutcome(ok,dir,blockedCount){
+
+    lockBeeDirections(){
+      this.refs.beeDirectionLocked=true;
+      Object.values(this.refs.dirButtons||{}).forEach(obj=>{
+        const bg=obj?.list?.[0];
+        if(bg && bg.input) bg.disableInteractive();
+      });
+    }
+    unlockBeeDirections(){
+      this.refs.beeDirectionLocked=false;
+      Object.entries(this.refs.dirButtons||{}).forEach(([dir,obj])=>{
+        if((this.refs.blocked||[]).includes(dir))return;
+        const bg=obj?.list?.[0];
+        if(bg) bg.setInteractive({useHandCursor:true});
+      });
+    }
+    beeApproachObstacle(dir){
+      return new Promise(resolve=>{
+        const bee=this.refs.bee, target=this.refs.beeTargets?.[dir];
+        if(!bee || !target || !target.valid){ resolve(); return; }
+        this.lockBeeDirections();
+        this.tweens.killTweensOf(bee);
+        const home=this.refs.beeHome||{x:bee.x,y:bee.y};
+        const dx=target.x-home.x, dy=target.y-home.y;
+        const len=Math.max(1,Math.hypot(dx,dy));
+        const stop=24;
+        const stopX=target.x-dx/len*stop, stopY=target.y-dy/len*stop;
+        if(this.refs.beeHalo) this.refs.beeHalo.setVisible(false);
+        if(this.refs.beeLabel) this.refs.beeLabel.setVisible(false);
+        const tile=this.refs.beeTargetTiles?.[dir];
+        if(tile && tile.setScale) this.tweens.add({targets:tile,scale:1.1,duration:160,yoyo:true,repeat:1});
+        this.tweens.add({targets:bee,x:stopX,y:stopY,duration:520,ease:'Sine.inOut',onComplete:()=>{
+          this.refs.beeApproachPos={x:stopX,y:stopY};
+          this.popMessage('GẶP CHƯỚNG NGẠI - TRẢ LỜI CÂU HỎI','#fff7d6',C.amber);
+          this.time.delayedCall(420,resolve);
+        }});
+      });
+    }
+
+    beeOutcome(ok,dir,blockedCount){
       return new Promise(resolve=>{
         const bee=this.refs.bee;
         if(!bee){resolve();return;}
-        const target=this.refs.beeTargets?.[dir] || {x:bee.x,y:bee.y};
+        const target=this.refs.beeTargets?.[dir] || {x:bee.x,y:bee.y,valid:true};
+        const home=this.refs.beeHome||{x:bee.x,y:bee.y};
         if(ok){
           this.tweens.killTweensOf(bee);
-          const trail=this.add.circle(bee.x,bee.y,26,C.yellow,.22);
+          const tile=this.refs.beeTargetTiles?.[dir];
+          if(tile){this.tweens.add({targets:tile,alpha:0,scale:.15,duration:260,ease:'Back.in'});}
+          const trail=this.add.circle(bee.x,bee.y,26,C.yellow,.22).setDepth(26);
           this.tweens.add({targets:trail,scale:2.2,alpha:0,duration:650,onComplete:()=>trail.destroy()});
-          for(let i=0;i<10;i++){
-            const s=this.add.image(bee.x,bee.y,'spark').setScale(.3+Math.random()*.25).setTint(i%2?0xffd43b:0xffffff);
+          for(let i=0;i<12;i++){
+            const s=this.add.image(bee.x,bee.y,'spark').setScale(.3+Math.random()*.25).setTint(i%2?0xffd43b:0xffffff).setDepth(35);
             this.tweens.add({targets:s,x:bee.x-25+Math.random()*50,y:bee.y-40+Math.random()*80,alpha:0,angle:180+Math.random()*200,duration:550+Math.random()*300,onComplete:()=>s.destroy()});
           }
-          this.tweens.add({targets:bee,x:target.x,y:target.y,duration:650,ease:'Sine.inOut',onComplete:()=>{this.popMessage('ĐÚNG! ONG ĐÃ TIẾN LÊN','#d8ffeb',C.green);resolve();}});
+          this.tweens.add({targets:bee,x:target.x,y:target.y,duration:430,ease:'Sine.inOut',onComplete:()=>{
+            this.popMessage('ĐÚNG! VƯỢT QUA CHƯỚNG NGẠI','#d8ffeb',C.green);
+            this.time.delayedCall(420,resolve);
+          }});
         }else{
           this.cameras.main.shake(250,.008);
-          const p=target.valid?target:this.directionPoint(dir,bee.x,bee.y);
-          const rock=this.add.container(p.x,p.y);
-          const rg=this.add.graphics();
-          rg.fillStyle(0x7d858d,1); rg.fillCircle(0,0,20); rg.fillStyle(0xaab1b8,1); rg.fillCircle(-6,-5,7); rg.fillCircle(5,2,5); rg.lineStyle(2,0x666d74,.8); rg.strokeCircle(0,0,20);
-          rock.add(rg); rock.setScale(.1);
-          this.tweens.add({targets:rock,scale:1,duration:260,ease:'Back.out'});
-          this.tweens.add({targets:bee,x:'-=12',duration:85,yoyo:true,repeat:3,ease:'Sine.inOut'});
-          this.popMessage(blockedCount>=4?'HẾT ĐƯỜNG!':'SAI - HƯỚNG ĐÃ BỊ KHÓA','#ffe0e0',C.red);
-          this.time.delayedCall(850,resolve);
+          const tile=this.refs.beeTargetTiles?.[dir];
+          if(tile) this.tweens.add({targets:tile,rotation:.08,duration:70,yoyo:true,repeat:4});
+          this.tweens.add({targets:bee,x:home.x,y:home.y,duration:470,ease:'Sine.inOut',onComplete:()=>{
+            if(this.refs.beeHalo){this.refs.beeHalo.setPosition(home.x,home.y).setVisible(true);}
+            if(this.refs.beeLabel){this.refs.beeLabel.setPosition(home.x,home.y-48).setVisible(true);}
+            this.popMessage(blockedCount>=4?'HẾT ĐƯỜNG!':'SAI - HƯỚNG NÀY BỊ ĐÁ CHẶN','#ffe0e0',C.red);
+            this.time.delayedCall(500,resolve);
+          }});
         }
       });
     }
@@ -593,6 +661,9 @@ beeOutcome(ok,dir,blockedCount){
   function updateSoccerScore(v){withScene(s=>s.updateSoccerScore(v));}
   function updateBeeTimer(sec){withScene(s=>s.updateBeeTimer(sec));}
   function updateBeeScore(v){withScene(s=>s.updateBeeScore(v));}
+  function approachBeeObstacle(dir){return new Promise(resolve=>withScene(s=>Promise.resolve(s.beeApproachObstacle(dir)).then(resolve)));}
+  function lockBeeDirections(){withScene(s=>s.lockBeeDirections());}
+  function unlockBeeDirections(){withScene(s=>s.unlockBeeDirections());}
   function lockSoccerAnswers(){withScene(s=>s.lockSoccerAnswers());}
   function unlockSoccerAnswers(){withScene(s=>s.unlockSoccerAnswers());}
   function showBasketball(opts){withScene(s=>s.showBasketball(opts));}
@@ -605,5 +676,5 @@ beeOutcome(ok,dir,blockedCount){
   function selectDirection(dir){withScene(s=>s.selectDirection(dir));}
   function destroy(){if(game){game.destroy(true);game=null;scene=null;ready=false;}}
 
-  window.ChemGames={ready:true,ensure,showBee,showSoccer,updateSoccerTimer,updateSoccerScore,updateBeeTimer,updateBeeScore,lockSoccerAnswers,unlockSoccerAnswers,showBasketball,updateBasketballTimer,updateBasketballScore,lockBasketballAnswers,unlockBasketballAnswers,showRacing,outcome,selectDirection,destroy};
+  window.ChemGames={ready:true,ensure,showBee,showSoccer,updateSoccerTimer,updateSoccerScore,updateBeeTimer,updateBeeScore,approachBeeObstacle,lockBeeDirections,unlockBeeDirections,lockSoccerAnswers,unlockSoccerAnswers,showBasketball,updateBasketballTimer,updateBasketballScore,lockBasketballAnswers,unlockBasketballAnswers,showRacing,outcome,selectDirection,destroy};
 })();

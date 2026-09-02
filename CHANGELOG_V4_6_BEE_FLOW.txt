@@ -1,0 +1,18 @@
+V4.6 - Sửa luồng chơi Ong tìm mật
+
+1. Làm nhân vật Ong nổi bật hơn:
+- Tăng kích thước nhân vật.
+- Đưa lên lớp hiển thị cao hơn bàn cờ.
+- Thêm vòng sáng và nhãn ONG.
+
+2. Đổi luồng câu hỏi:
+- Khi bắt đầu KHÔNG hiện câu hỏi.
+- Người chơi chọn hướng ↑ ↓ ← → trước.
+- Ong bay tới ô/chướng ngại vật đã chọn.
+- Sau khi Ong tới nơi, câu hỏi trả lời ngắn mới xuất hiện.
+- Đúng: ô dấu hỏi biến mất, Ong vượt chướng ngại, được cộng điểm.
+- Sai: Ong quay về vị trí cũ; hướng vừa chọn bị biến thành đá chặn.
+- Nếu cả 4 hướng bị chặn, mini game kết thúc.
+
+3. Đồng hồ 20 phút vẫn chạy liên tục kể cả lúc Ong đang di chuyển.
+4. Giữ nguyên Supabase, Admin, bảng xếp hạng và các mini game khác.

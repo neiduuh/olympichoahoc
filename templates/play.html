@@ -45,7 +45,7 @@ const games=[
 
 let gi=0, qi=0, score=0, violations=0, started=Date.now(), detail=[];
 let questionDeadline=null, timerHandle=null, locked=false;
-let beeStep=0, beeBlockedDirs=new Set(), beeChosenDir=null, beeStartedAt=null;
+let beeStep=0, beeBlockedDirs=new Set(), beeChosenDir=null, beeStartedAt=null, beeApproaching=false, beeQuestionVisible=false;
 let raceProgress=0;
 const questionRoot=document.getElementById('questionRoot');
 const scoreEl=document.getElementById('score');
@@ -127,11 +127,13 @@ function renderPhaseTabs(){
 function startQuestionTimer(seconds){
   clearInterval(timerHandle);
   questionDeadline=Date.now()+Math.max(1,seconds)*1000;
-  const el=document.getElementById('qtime'); if(!el)return;
   const tick=()=>{
     const left=Math.ceil((questionDeadline-Date.now())/1000);
-    el.textContent=fmt(left);
-    el.closest('.question-timer')?.classList.toggle('urgent',left<=30);
+    const el=document.getElementById('qtime');
+    if(el){
+      el.textContent=fmt(left);
+      el.closest('.question-timer')?.classList.toggle('urgent',left<=30);
+    }
     if(games[gi]?.[0]==='soccer') window.ChemGames?.updateSoccerTimer(left);
     if(games[gi]?.[0]==='basketball') window.ChemGames?.updateBasketballTimer(left);
     if(games[gi]?.[0]==='bee') window.ChemGames?.updateBeeTimer(left);
@@ -154,7 +156,7 @@ function timeoutQuestion(){
   }
 }
 function disableQuestionControls(){questionRoot.querySelectorAll('button,input,select').forEach(el=>el.disabled=true);if(games[gi]?.[0]==='soccer')window.ChemGames?.lockSoccerAnswers(); if(games[gi]?.[0]==='basketball')window.ChemGames?.lockBasketballAnswers();}
-function nextQuestion(){clearInterval(timerHandle);locked=false;qi++;beeChosenDir=null;render()}
+function nextQuestion(){clearInterval(timerHandle);locked=false;beeApproaching=false;beeQuestionVisible=false;qi++;beeChosenDir=null;render()}
 
 function render(){
   clearInterval(timerHandle);locked=false;
@@ -211,22 +213,40 @@ function bindAnswers(q){
 function renderBee(q,n){
   document.querySelector('.pro-hud')?.classList.remove('soccer-hud-hidden');
   if(beeStartedAt===null)beeStartedAt=Date.now();
+  beeApproaching=false;
+  beeQuestionVisible=false;
   const remaining=1200-Math.floor((Date.now()-beeStartedAt)/1000);
   window.ChemGames?.showBee({
     step:Math.min(6,Math.round((beeStep/Math.max(1,n))*6)),
-    blocked:[...beeBlockedDirs], selected:beeChosenDir,
+    blocked:[...beeBlockedDirs], selected:null,
     score,timeLeft:remaining,playerName,className:playerClass,
-    onDirection:(dir)=>{
+    onDirection:async(dir)=>{
+      if(beeApproaching||beeQuestionVisible||locked)return;
+      beeApproaching=true;
       beeChosenDir=dir;
       window.ChemGames?.selectDirection(dir);
-      const btn=document.getElementById('shortSubmit'); if(btn)btn.disabled=false;
-      const help=document.getElementById('beeHelp'); if(help)help.textContent=`Đã chọn hướng ${dir==='up'?'↑':dir==='down'?'↓':dir==='left'?'←':'→'}. Bây giờ hãy trả lời câu hỏi.`;
-      document.getElementById('ans')?.focus();
+      window.ChemGames?.lockBeeDirections();
+      questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>🐝 Ong đang bay tới chướng ngại vật...</b><br><span>Chỉ khi chạm chướng ngại vật, câu hỏi mới xuất hiện.</span><span id="qtime" style="display:none"></span></div>`;
+      try{
+        await (window.ChemGames?.approachBeeObstacle(dir)||Promise.resolve());
+        showBeeQuestion(q,n);
+      }catch(e){
+        beeApproaching=false;
+        window.ChemGames?.unlockBeeDirections();
+        questionRoot.innerHTML=`<div class="flash danger">Không thể di chuyển Ong. Hãy thử chọn lại hướng.</div><span id="qtime" style="display:none"></span>`;
+      }
     }
   });
-  questionRoot.innerHTML=questionCard(q,`Chướng ngại ${qi+1}/${n}`,shortInput(),'<span id="beeHelp">Hãy chọn một hướng trên bản đồ game trước khi trả lời.</span>');
-  bindAnswers(q); document.getElementById('shortSubmit').disabled=!beeChosenDir;
+  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>🐝 Hãy điều khiển Ong trên bản đồ.</b><br><span>Chọn ↑ ↓ ← →. Ong sẽ bay tới chướng ngại vật; lúc đó câu hỏi mới hiện ra.</span><span id="qtime" style="display:none"></span></div>`;
   startQuestionTimer(remaining);
+}
+function showBeeQuestion(q,n){
+  beeApproaching=false;
+  beeQuestionVisible=true;
+  questionRoot.innerHTML=questionCard(q,`Chướng ngại ${qi+1}/${n}`,shortInput(),'<span id="beeHelp">Ong đã đến chướng ngại vật. Trả lời đúng để vượt qua; sai thì hướng này sẽ bị khóa.</span>');
+  bindAnswers(q);
+  document.getElementById('shortSubmit').disabled=false;
+  document.getElementById('ans')?.focus();
 }
 function renderSoccer(q,n){
   document.querySelector('.pro-hud')?.classList.add('soccer-hud-hidden');
