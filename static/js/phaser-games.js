@@ -24,6 +24,10 @@
 
   class MainScene extends Phaser.Scene {
     constructor(){ super('Main'); this.mode=null; this.refs={}; this.onDirection=null; }
+    preload(){
+      const assets=window.CHEM_ASSETS||window.ChemAssets||{};
+      if(assets.basketballScene && !this.textures.exists('basketScene')) this.load.image('basketScene', assets.basketballScene);
+    }
     create(){
       this.cameras.main.setBackgroundColor('#071a28');
       this.makeTextures();
@@ -493,79 +497,87 @@
       const col=good?0x138c57:0xb7333f;const box=this.add.rectangle(560,304,360,46,col,.96).setDepth(30).setStrokeStyle(3,0xffffff,.75).setScale(.7).setAlpha(0);const t=this.add.text(560,304,text,{...labelStyle(23,'#ffffff'),strokeThickness:2}).setOrigin(.5).setDepth(31).setScale(.7).setAlpha(0);this.tweens.add({targets:[box,t],alpha:1,scale:1,duration:220,ease:'Back.out',hold:450,yoyo:true,onComplete:()=>{box.destroy();t.destroy();}});
     }
     spawnSoccerConfetti(){for(let i=0;i<28;i++){const x=420+Math.random()*280,y=155+Math.random()*70;const s=this.add.image(x,y,'spark').setTint([0xffd43b,0x5ee4ff,0xff7887,0xffffff][i%4]).setScale(.28+Math.random()*.25).setDepth(25);this.tweens.add({targets:s,x:x-60+Math.random()*120,y:y+110+Math.random()*80,angle:300+Math.random()*360,alpha:0,duration:700+Math.random()*500,onComplete:()=>s.destroy()});}}
-    netPulse(){const r=this.add.rectangle(this.mode==='soccer'?560:790,this.mode==='soccer'?230:357,this.mode==='soccer'?310:215,this.mode==='soccer'?160:140,0x9fffc4,.13);this.tweens.add({targets:r,alpha:0,scale:1.08,duration:550,onComplete:()=>r.destroy()});}
+    netPulse(){const r=this.mode==='soccer'?this.add.rectangle(560,230,310,160,0x9fffc4,.13):this.add.circle((this.refs.netTarget?.x)||480,(this.refs.netTarget?.y)||228,55,0x9fffc4,.15);this.tweens.add({targets:r,alpha:0,scale:1.12,duration:550,onComplete:()=>r.destroy()});}
 
     showBasketball(o={}){
       this.clearScene();
       this.mode='basketball';
       this.refs.basketLocked=false;
       this.refs.onBasketAnswer=o.onAnswer||null;
-      // arena background
-      const bg=this.add.graphics();
-      bg.fillStyle(0x13304a,1); bg.fillRect(0,0,W,165);
-      bg.fillStyle(0x1e4566,1); bg.fillRect(0,95,W,70);
-      for(let row=0;row<4;row++) for(let i=0;i<32;i++){
-        bg.fillStyle([0xf7f7f7,0xf7b733,0x4e86d7,0xe0626b][(i+row)%4],.72);
-        bg.fillCircle(16+i*30,112+row*16,4.5);
+
+      // soft gym background matching approved preview
+      const hasScene=this.textures.exists('basketScene');
+      if(hasScene){
+        this.add.image(W/2,H/2,'basketScene').setDisplaySize(560,500).setAlpha(.98).setDepth(1);
+      }else{
+        const bg=this.add.graphics();
+        bg.fillStyle(0xdedede,1); bg.fillRect(0,0,W,H);
+        bg.fillStyle(0xcfcfcf,1); bg.fillRect(140,0,680,H);
+        bg.fillStyle(0xe9e9e9,1); bg.fillTriangle(0,H,140,0,140,H); bg.fillTriangle(W,H,W-140,0,W-140,H);
       }
-      bg.fillStyle(0xc67e42,1); bg.fillRect(0,165,W,335);
-      for(let i=0;i<12;i++){ bg.fillStyle(i%2?0xcf8851:0xba7239,.35); bg.fillRect(i*80,165,80,335); }
-      bg.lineStyle(5,0xffffff,.78); bg.beginPath(); bg.moveTo(110,470); bg.lineTo(850,470); bg.strokePath();
-      bg.strokeCircle(480,468,138);
-      bg.fillStyle(0x7cb8de,1); bg.fillRect(720,92,150,70); bg.fillStyle(0x9dd7f1,1); bg.fillRect(730,104,28,24); bg.fillRect(770,104,28,24); bg.fillRect(810,104,28,24);
-      bg.fillStyle(0x5aa15b,1); bg.fillRect(0,145,W,20);
+      const bgfx=this.add.graphics();
+      bgfx.fillStyle(0x000000,.07); bgfx.fillRect(0,0,W,500);
 
-      // left contestant / timer / score column
-      const panelX=12,panelW=158;
-      this.add.rectangle(panelX,10,panelW,118,0x6a3414,.95).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
-      this.add.circle(panelX+79,43,27,0xeef7ff,1).setStrokeStyle(3,0xffffff,.8);
-      this.add.circle(panelX+79,39,11,0xa8b7c5,1); this.add.ellipse(panelX+79,67,40,25,0xa8b7c5,1);
-      const name=String(o.playerName||'Thí sinh');
-      this.add.text(panelX+79,84,name.length>19?name.slice(0,18)+'…':name,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-      this.add.text(panelX+79,105,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'11px',color:'#fff0d8'}).setOrigin(.5);
-
-      this.add.rectangle(panelX,136,panelW,82,0x7b4318,.97).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
-      this.add.text(panelX+18,150,'⏱  THỜI GIAN',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
-      this.refs.basketTimer=this.add.text(panelX+79,190,this.formatSoccerTime(o.timeLeft??120),{...labelStyle(32,'#ffd844'),strokeThickness:2}).setOrigin(.5);
-      this.add.rectangle(panelX,226,panelW,82,0x6a3414,.97).setOrigin(0).setStrokeStyle(3,0xf0d08b,.85);
-      this.add.text(panelX+18,240,'★  ĐIỂM',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff8e7'});
-      this.refs.basketScore=this.add.text(panelX+79,282,String(o.score??0),{...labelStyle(34,'#ffd844'),strokeThickness:2}).setOrigin(.5);
-
-      // top board with question
-      this.add.rectangle(185,13,760,122,0x9b6a25,1).setOrigin(0).setStrokeStyle(4,0x5b3b12,1);
-      this.add.rectangle(192,20,746,108,0xfff8c9,1).setOrigin(0).setStrokeStyle(2,0xd8bc67,1);
-      this.add.text(215,31,`CÂU ${o.question||1}/${o.total||10}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#b15c17'});
+      // question board
+      this.add.rectangle(176,14,768,118,0x4b5661,.94).setOrigin(0).setStrokeStyle(4,0xffffff,.38).setDepth(5);
+      this.add.text(196,30,`CÂU ${o.question||1}/${o.total||10}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffe7a7'}).setDepth(6);
       const qRaw=String(o.questionText||'');
-      const qFs=qRaw.length>155?16:qRaw.length>105?19:24;
-      const qText=this.add.text(215,55,qRaw,{fontFamily:'Arial',fontSize:`${qFs}px`,fontStyle:'bold',color:'#1e2730',wordWrap:{width:690,useAdvancedWrap:true},lineSpacing:4});
-      qText.setOrigin(0,0);
+      const qFs=qRaw.length>150?16:qRaw.length>105?19:23;
+      this.add.text(196,52,qRaw,{fontFamily:'Arial',fontSize:`${qFs}px`,fontStyle:'bold',color:'#ffffff',wordWrap:{width:720,useAdvancedWrap:true},lineSpacing:4}).setDepth(6);
 
-      // board and hoop
-      this.add.rectangle(793,185,132,90,0xf4fbff,.96).setStrokeStyle(5,0x54636f,1);
-      this.add.rectangle(793,193,58,42,0xffffff,0).setStrokeStyle(3,0xd95c45,1);
-      const rim=this.add.ellipse(793,243,82,20,0xd95c45,0).setStrokeStyle(7,0xd95c45,1); this.refs.rim=rim;
-      const ng=this.add.graphics(); ng.lineStyle(2,0xffffff,.78);
-      for(let i=-30;i<=30;i+=15){ ng.beginPath(); ng.moveTo(793+i,250); ng.lineTo(793+i*.55,304); ng.strokePath(); }
-      ng.lineStyle(2,0xffffff,.55); [263,278,292].forEach(y=>{ ng.beginPath(); ng.moveTo(767,y); ng.lineTo(819,y); ng.strokePath(); });
-      this.refs.player=this.createPlayer(255,396,0x8d4fc5,1.13);
-      const ball=this.add.image(345,402,'basketBall').setScale(.72).setDepth(8); this.refs.ball=ball;
-      this.add.ellipse(345,420,90,15,0x7b4f29,.25).setDepth(7);
-      this.add.text(793,325,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ NÉM',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#fff1df'}).setOrigin(.5);
+      // left info panel
+      const panelX=10,panelW=150;
+      this.add.rectangle(panelX,16,panelW,96,0x31353d,.93).setOrigin(0).setStrokeStyle(3,0xffffff,.18).setDepth(6);
+      this.add.circle(panelX+43,48,22,0xeef7ff,1).setStrokeStyle(2,0xffffff,.8).setDepth(7);
+      this.add.circle(panelX+43,45,8,0xa8b7c5,1).setDepth(7);
+      this.add.ellipse(panelX+43,66,30,18,0xa8b7c5,1).setDepth(7);
+      const name=String(o.playerName||'Thí sinh');
+      this.add.text(panelX+78,36,name.length>15?name.slice(0,14)+'…':name,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
+      this.add.text(panelX+78,56,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'10px',color:'#dfebf7'}).setDepth(7);
+      this.add.text(panelX+78,79,'BÓNG RỔ',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#ffd788'}).setDepth(7);
 
-      // answer panels on the court
-      const options=(o.options||[]).slice(0,4); this.refs.basketButtons=[];
-      const positions=[[365,332],[760,332],[365,408],[760,408]];
+      this.add.rectangle(panelX,124,panelW,76,0x31353d,.93).setOrigin(0).setStrokeStyle(3,0xffffff,.18).setDepth(6);
+      this.add.text(panelX+16,138,'ĐIỂM',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
+      this.refs.basketScore=this.add.text(panelX+75,166,String(o.score??0),{...labelStyle(28,'#ffd844'),strokeThickness:2}).setOrigin(.5).setDepth(7);
+
+      this.add.rectangle(panelX,212,panelW,76,0x31353d,.93).setOrigin(0).setStrokeStyle(3,0xffffff,.18).setDepth(6);
+      this.add.text(panelX+16,226,'THỜI GIAN',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
+      this.refs.basketTimer=this.add.text(panelX+75,255,this.formatSoccerTime(o.timeLeft??120),{...labelStyle(24,'#ffd844'),strokeThickness:2}).setOrigin(.5).setDepth(7);
+
+      // hoop highlight / actor zone using approved composition
+      this.add.rectangle(480,250,540,230,0xffffff,0).setStrokeStyle(0,0,0,0).setDepth(3);
+      const ball=this.add.image(395,384,'basketBall').setScale(.66).setDepth(12);
+      this.refs.ball=ball;
+      this.add.ellipse(395,402,78,12,0x000000,.16).setDepth(11);
+      // extra front player silhouette if the image asset is missing
+      if(!hasScene){
+        this.refs.player=this.createPlayer(475,385,0x2c70d6,1.18);
+      } else {
+        // invisible reference target so outcome animations have a stable anchor
+        this.refs.player={x:470,y:394};
+      }
+      // rim target aligns to approved preview image placed at center
+      this.refs.rimTarget={x:480,y:205};
+      this.refs.netTarget={x:480,y:228};
+
+      this.add.text(480,414,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ NÉM',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(8);
+
+      // answer panels around bottom
+      const options=(o.options||[]).slice(0,4);
+      this.refs.basketButtons=[];
+      const positions=[[265,430],[695,430],[265,480],[695,480]];
       options.forEach((txt,i)=>{
-        const [x,y]=positions[i]; const c=this.add.container(x,y).setDepth(10);
-        const bg=this.add.rectangle(0,0,350,56,0xfff9d7,1).setStrokeStyle(4,0x8b6328,1);
-        const badge=this.add.circle(-145,0,22,0xb75e18,1).setStrokeStyle(3,0xffffff,1);
-        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-        const fs=String(txt).length>36?16:String(txt).length>24?18:21;
-        const t=this.add.text(-112,0,String(txt),{fontFamily:'Arial',fontSize:`${fs}px`,fontStyle:'bold',color:'#202832',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
+        const [x,y]=positions[i];
+        const c=this.add.container(x,y).setDepth(20);
+        const bg=this.add.rectangle(0,0,350,52,0xffffff,.96).setStrokeStyle(4,0x9a9a9a,1);
+        const badge=this.add.circle(-145,0,20,0xf28b25,1).setStrokeStyle(3,0xffffff,1);
+        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Arial',fontSize:'21px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+        const fs=String(txt).length>34?15:String(txt).length>24?17:20;
+        const t=this.add.text(-112,0,String(txt),{fontFamily:'Arial',fontSize:`${fs}px`,fontStyle:'bold',color:'#252a31',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
         c.add([bg,badge,letter,t]);
         bg.setInteractive({useHandCursor:true});
-        bg.on('pointerover',()=>{ if(!this.refs.basketLocked){ bg.setFillStyle(0xffef9f,1); c.setScale(1.018); } });
-        bg.on('pointerout',()=>{ if(!this.refs.basketLocked){ bg.setFillStyle(0xfff9d7,1); c.setScale(1); } });
+        bg.on('pointerover',()=>{if(!this.refs.basketLocked){bg.setFillStyle(0xfff2ce,1);c.setScale(1.02);}});
+        bg.on('pointerout',()=>{if(!this.refs.basketLocked){bg.setFillStyle(0xffffff,.96);c.setScale(1);}});
         bg.on('pointerdown',()=>this.chooseBasketballAnswer(i));
         this.refs.basketButtons.push({c,bg,badge,letter,t});
       });
@@ -577,24 +589,42 @@
       if(this.refs.onBasketAnswer) this.refs.onBasketAnswer(String(i));
     }
     lockBasketballAnswers(){ this.refs.basketLocked=true; (this.refs.basketButtons||[]).forEach(b=>b.bg.disableInteractive()); }
-    unlockBasketballAnswers(){ this.refs.basketLocked=false; (this.refs.basketButtons||[]).forEach(b=>{ b.bg.setInteractive({useHandCursor:true}); b.bg.setFillStyle(0xfff9d7,1); b.c.setScale(1); b.badge.setFillStyle(0xb75e18,1); }); }
+    unlockBasketballAnswers(){ this.refs.basketLocked=false; (this.refs.basketButtons||[]).forEach(b=>{ b.bg.setInteractive({useHandCursor:true}); b.bg.setFillStyle(0xffffff,.96); b.c.setScale(1); b.badge.setFillStyle(0xf28b25,1); }); }
     updateBasketballTimer(sec){ if(this.refs.basketTimer){ this.refs.basketTimer.setText(this.formatSoccerTime(sec)); this.refs.basketTimer.setColor(sec<=30?'#ff8b92':'#ffd844'); } }
     updateBasketballScore(v){ if(this.refs.basketScore) this.refs.basketScore.setText(String(v)); }
     basketballOutcome(ok){
       return new Promise(resolve=>{
         const ball=this.refs.ball;
-        if(!ball){ resolve(); return; }
-        const start=new Phaser.Math.Vector2(ball.x,ball.y), control=new Phaser.Math.Vector2(565,115), end=ok?new Phaser.Math.Vector2(793,255):new Phaser.Math.Vector2(830,232);
-        const curve=new Phaser.Curves.QuadraticBezier(start,control,end); const state={t:0};
-        this.tweens.add({targets:this.refs.player,rotation:-.12,duration:180,yoyo:true});
-        this.tweens.add({targets:state,t:1,duration:980,ease:'Sine.inOut',onUpdate:()=>{ const p=curve.getPoint(state.t); ball.setPosition(p.x,p.y); ball.angle+=18; },onComplete:()=>{
+        const rim=this.refs.rimTarget||{x:480,y:205};
+        const net=this.refs.netTarget||{x:480,y:228};
+        if(!ball){resolve();return;}
+        const start=new Phaser.Math.Vector2(ball.x,ball.y);
+        const end=ok?new Phaser.Math.Vector2(rim.x,net.y):new Phaser.Math.Vector2(rim.x+110*(Math.random()<.5?-1:1),rim.y+25);
+        const control=new Phaser.Math.Vector2((start.x+rim.x)/2,82);
+        const curve=new Phaser.Curves.QuadraticBezier(start,control,end);
+        const state={t:0};
+        const whoosh=this.add.text(start.x,start.y-20,'🏀',{fontFamily:'Arial',fontSize:'22px'}).setDepth(22).setAlpha(0);
+        this.tweens.add({targets:whoosh,alpha:1,scale:1.35,duration:120,yoyo:true,onComplete:()=>whoosh.destroy()});
+        this.tweens.add({targets:state,t:1,duration:900,ease:'Sine.inOut',onUpdate:()=>{ const p=curve.getPoint(state.t); ball.setPosition(p.x,p.y); ball.angle+=18; ball.setScale(.66-(state.t*.18)); },onComplete:()=>{
           if(ok){
-            this.tweens.add({targets:ball,y:325,scale:.55,duration:330,ease:'Quad.in',onComplete:()=>{ this.popMessage('SWISH! +10','#fff4df',C.orange); for(let i=0;i<12;i++){ const s=this.add.image(793,255,'spark').setTint(0xffc54d).setScale(.35); this.tweens.add({targets:s,x:755+Math.random()*76,y:225+Math.random()*90,alpha:0,duration:650,onComplete:()=>s.destroy()}); } this.time.delayedCall(600,resolve); }});
+            this.tweens.add({targets:ball,y:net.y+48,scale:.34,duration:250,ease:'Quad.in'});
+            this.netPulse();
+            this.basketResultBanner('VÀO RỔ!  +10 ĐIỂM',true);
+            for(let i=0;i<18;i++){const s=this.add.image(net.x,net.y,'spark').setTint([0xffd43b,0xffffff,0x7ee4ff][i%3]).setScale(.22+Math.random()*.18).setDepth(25);this.tweens.add({targets:s,x:net.x-55+Math.random()*110,y:net.y-35+Math.random()*90,alpha:0,angle:280+Math.random()*260,duration:600+Math.random()*450,onComplete:()=>s.destroy()});}
+            this.time.delayedCall(850,resolve);
           }else{
-            this.tweens.add({targets:ball,x:742,y:390,angle:ball.angle+360,duration:520,ease:'Bounce.out'}); this.tweens.add({targets:this.refs.rim,scaleX:1.08,duration:90,yoyo:true,repeat:2}); this.popMessage('BẬT VÀNH!','#ffe4e4',C.red); this.time.delayedCall(850,resolve);
+            this.basketResultBanner('KHÔNG VÀO!',false);
+            this.tweens.add({targets:ball,x:end.x+(end.x>rim.x?30:-30),y:end.y+120,angle:ball.angle+220,scale:.45,duration:420,ease:'Bounce.out'});
+            this.time.delayedCall(820,resolve);
           }
         }});
       });
+    }
+    basketResultBanner(text,good){
+      const col=good?0x1f8b57:0xba3943;
+      const box=this.add.rectangle(480,364,300,44,col,.95).setDepth(30).setStrokeStyle(3,0xffffff,.8).setScale(.7).setAlpha(0);
+      const t=this.add.text(480,364,text,{...labelStyle(22,'#ffffff'),strokeThickness:2}).setOrigin(.5).setDepth(31).setScale(.7).setAlpha(0);
+      this.tweens.add({targets:[box,t],alpha:1,scale:1,duration:220,ease:'Back.out',hold:420,yoyo:true,onComplete:()=>{box.destroy();t.destroy();}});
     }
     showRacing(o={}){
 

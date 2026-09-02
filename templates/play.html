@@ -37,6 +37,7 @@ const attemptId={{attempt_id}}, roundId={{r.id}};
 const playerName={{(me.full_name or me.username)|tojson}};
 const playerClass={{(me.class_name or '')|tojson}};
 const sport=(grouped.soccer||[]).length ? 'soccer' : ((grouped.basketball||[]).length ? 'basketball' : null);
+window.CHEM_ASSETS={basketballScene: {{ url_for('static', filename='img/basketball_scene_v49.png')|tojson }} };
 const games=[
   ['bee','Đào kho báu','⛏️'],
   ...(sport?[[sport,sport==='soccer'?'Sút bóng vào lưới':'Ném bóng vào rổ',sport==='soccer'?'⚽':'🏀']]:[]),
@@ -98,7 +99,7 @@ if(!phaserOK){
   return;
 }
 try{
-  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.8.1");
+  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=4.9");
 }catch(e){
   fallbackBox.hidden=false;
   fallbackBox.textContent='Đã tải Phaser nhưng không tải được mã mini game. Hãy tải lại trang.';
@@ -225,6 +226,22 @@ function bindAnswers(q){
   }
 }
 
+const mcqShuffleMap=new Map();
+function getShuffledMcq(q){
+  if(mcqShuffleMap.has(q.id)) return mcqShuffleMap.get(q.id);
+  const options=(q.options||[]).map((text,originalIndex)=>({text,originalIndex}));
+  for(let i=options.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [options[i],options[j]]=[options[j],options[i]];
+  }
+  const result={
+    options: options.map(x=>x.text),
+    answerMap: options.map(x=> String(x.originalIndex))
+  };
+  mcqShuffleMap.set(q.id,result);
+  return result;
+}
+
 function treasureKey(c,r){return `${c},${r}`}
 function treasureHasPath(){
   const start=treasure.position, goal=treasure.goal, rocks=treasure.rocks;
@@ -317,11 +334,12 @@ function renderSoccer(q,n){
 }
 function renderBasketball(q,n){
   document.querySelector('.pro-hud')?.classList.add('soccer-hud-hidden');
-  questionRoot.innerHTML='<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngay trên sân để thực hiện cú ném.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
+  const shuffled=getShuffledMcq(q);
+  questionRoot.innerHTML='<div id="feedback" class="soccer-status-strip" aria-live="polite">Chọn một đáp án A/B/C/D ngẫu nhiên ngay trên sân để thực hiện cú ném.</div><div class="question-timer soccer-hidden-timer"><span>Thời gian còn lại</span><strong id="qtime">02:00</strong></div>';
   window.ChemGames?.showBasketball({
-    question:qi+1,total:n,questionText:q.content,options:q.options||[],score,
+    question:qi+1,total:n,questionText:q.content,options:shuffled.options,score,
     timeLeft:120,playerName,className:playerClass,
-    onAnswer:(ans)=>submitAns(ans)
+    onAnswer:(ans)=>submitAns(shuffled.answerMap[+ans])
   });
   startQuestionTimer(120);
 }
