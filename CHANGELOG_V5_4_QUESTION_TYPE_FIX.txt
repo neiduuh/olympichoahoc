@@ -1,0 +1,6 @@
+V5.4 - Sửa giao diện nhập câu hỏi Admin
+- Sút bóng và Ném bóng tự chuyển sang Trắc nghiệm 4 phương án và hiện đủ A/B/C/D.
+- Đào kho báu dùng Trả lời ngắn.
+- Lái xe dùng 4 ý Đúng/Sai.
+- Bộ điều khiển dạng câu được nhúng trực tiếp trong trang Admin, không còn phụ thuộc file JS cache/404 trên Vercel.
+- Giữ nguyên định dạng chỉ số trên/dưới và xem trước ảnh câu hỏi.

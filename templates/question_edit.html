@@ -9,5 +9,85 @@
 <div id="tf4" style="display:none">{% for i in range(4) %}<div class="grid"><div class="field"><label>Ý {{'abcd'[i]}})</label><input name="tftext{{i}}" id="tftext{{i}}" value="{{q.options[i] if i < q.options|length else ''}}"><div class="chem-tools"><button type="button" onclick="chemFormat('tftext{{i}}','sub')">x₂</button><button type="button" onclick="chemFormat('tftext{{i}}','sup')">x²</button><button type="button" onclick="chemFormat('tftext{{i}}','normal')">Aa</button></div></div><div class="field"><label>Đúng/Sai</label><select name="tf{{i}}"><option value="true" {% if i < q.correct|length and q.correct[i] %}selected{% endif %}>Đúng</option><option value="false" {% if i < q.correct|length and not q.correct[i] %}selected{% endif %}>Sai</option></select></div></div>{% endfor %}</div>
 <div class="grid"><div class="field"><label>Điểm câu</label><input type="number" name="points" value="{{q.points}}"></div><div class="field"><label>Giải thích</label><input name="explanation" id="explanation" value="{{q.explanation or ''}}"><div class="chem-tools"><button type="button" onclick="chemFormat('explanation','sub')">x₂</button><button type="button" onclick="chemFormat('explanation','sup')">x²</button><button type="button" onclick="chemFormat('explanation','normal')">Aa</button></div></div></div>
 <button class="btn">💾 Lưu thay đổi</button></form></div>
-<script src="{{url_for('static',filename='js/admin-question-editor.js')}}?v=5.1"></script>
+<script>
+(function(){
+  'use strict';
+  const subMap={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','=':'₌','(':'₍',')':'₎'};
+  const supMap={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','=':'⁼','(':'⁽',')':'⁾'};
+  const reverse={};
+  Object.entries(subMap).forEach(([a,b])=>reverse[b]=a);
+  Object.entries(supMap).forEach(([a,b])=>reverse[b]=a);
+
+  function applyMap(el,map){
+    if(!el)return;
+    const a=el.selectionStart??0,b=el.selectionEnd??0;
+    if(a===b){
+      alert('Hãy bôi đen phần cần đổi thành chỉ số trước. Ví dụ: chọn số 2 trong H2O rồi bấm x₂.');
+      el.focus(); return;
+    }
+    const selected=el.value.slice(a,b);
+    const out=[...selected].map(ch=>map[ch]??ch).join('');
+    el.setRangeText(out,a,b,'select');
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.focus();
+  }
+
+  window.chemFormat=function(target,mode){
+    const el=document.getElementById(target);
+    if(!el)return;
+    applyMap(el,mode==='sub'?subMap:mode==='sup'?supMap:reverse);
+  };
+
+  window.showQuestionFields=function(){
+    const q=document.getElementById('qtype');
+    if(!q)return;
+    const type=q.value;
+    ['mcq','short','tf4'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){
+        const visible=id===type;
+        el.hidden=!visible;
+        el.style.display=visible?'block':'none';
+      }
+    });
+  };
+
+  window.syncQuestionType=function(){
+    const g=document.getElementById('game');
+    const q=document.getElementById('qtype');
+    const p=document.querySelector('input[name="points"]');
+    if(!g||!q)return;
+    const typeMap={bee:'short',soccer:'mcq',basketball:'mcq',racing:'tf4'};
+    const type=typeMap[g.value]||'short';
+    q.value=type;
+    Array.from(q.options).forEach(opt=>{ opt.disabled=opt.value!==type; });
+    if(p){
+      if(type==='mcq'){p.value=10;p.readOnly=true;}
+      else if(type==='tf4'){p.value=50;p.readOnly=true;}
+      else {p.value=10;p.readOnly=true;}
+    }
+    window.showQuestionFields();
+  };
+
+  window.previewQuestionImage=function(input){
+    const img=document.getElementById('questionImagePreview');
+    if(!img)return;
+    if(input.files&&input.files[0]){
+      img.src=URL.createObjectURL(input.files[0]);
+      img.hidden=false;
+    }
+  };
+
+  function initQuestionEditor(){
+    window.syncQuestionType();
+    const game=document.getElementById('game');
+    if(game && !game.dataset.questionTypeBound){
+      game.addEventListener('change',window.syncQuestionType);
+      game.dataset.questionTypeBound='1';
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initQuestionEditor,{once:true});
+  else initQuestionEditor();
+})();
+</script>
 {% endblock %}
