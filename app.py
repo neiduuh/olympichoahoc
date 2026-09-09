@@ -7,10 +7,21 @@ from openpyxl import Workbook
 from database import db, init_db, backend_name, IS_POSTGRES
 from datetime import datetime
 
-app = Flask(__name__)
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+
+# Vercel serves public/** via its CDN. On Render/local, Flask serves the same files
+# from public/static so one repository works on both platforms.
+app = Flask(
+    __name__,
+    static_folder=None if ON_VERCEL else "public/static",
+    static_url_path="/static",
+)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
 ADMIN_INITIAL_PASSWORD = os.environ.get("ADMIN_INITIAL_PASSWORD", "Admin@123")
-init_db(generate_password_hash(ADMIN_INITIAL_PASSWORD))
+# Existing Supabase data is reused. Avoid running CREATE/ALTER statements on every
+# Vercel cold start; set VERCEL_INIT_DB=1 only for a first-time empty database.
+if (not ON_VERCEL) or os.environ.get("VERCEL_INIT_DB") == "1":
+    init_db(generate_password_hash(ADMIN_INITIAL_PASSWORD))
 
 def current_user():
     if "uid" not in session: return None
@@ -93,10 +104,9 @@ def _question_form_values(r, existing_image=None):
 
 @app.route("/")
 def index():
-    con=db()
-    rounds=con.execute("SELECT * FROM rounds WHERE active=1 ORDER BY id DESC").fetchall()
-    con.close()
-    return render_template("index.html", rounds=rounds)
+    # Trang chủ chỉ giới thiệu cuộc thi. Danh sách vòng thi được hiển thị sau khi học sinh đăng nhập,
+    # nhờ đó trang đầu tải nhanh hơn trên Vercel và không cần truy vấn database.
+    return render_template("index.html")
 
 @app.route("/register", methods=["GET","POST"])
 def register():

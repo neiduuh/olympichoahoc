@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620" role="img" aria-label="Dụng cụ thí nghiệm hóa học">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c4278" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#06244a" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#63e7ff"/><stop offset="1" stop-color="#008fd5"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe569"/><stop offset="1" stop-color="#e99a0c"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="900" height="620" rx="42" fill="url(#bg)"/>
+  <g opacity=".22" stroke="#a9e9ff" fill="none" stroke-width="2">
+    <path d="M120 120h95l42 72 82-4 43 74"/><circle cx="120" cy="120" r="8"/><circle cx="215" cy="120" r="8"/><circle cx="257" cy="192" r="8"/><circle cx="339" cy="188" r="8"/><circle cx="382" cy="262" r="8"/>
+    <path d="M620 92l42 24v48l-42 24-42-24v-48z"/><path d="M620 92v96M578 116l84 48M662 116l-84 48"/>
+    <text x="96" y="305" fill="#c9f3ff" font-family="Times New Roman, serif" font-size="38">H₂O</text>
+    <text x="700" y="246" fill="#c9f3ff" font-family="Times New Roman, serif" font-size="34">CO₂</text>
+    <text x="548" y="330" fill="#c9f3ff" font-family="Times New Roman, serif" font-size="26">CH₃COOH</text>
+  </g>
+  <!-- burette stand -->
+  <g transform="translate(690 55)">
+    <rect x="76" y="15" width="10" height="470" rx="4" fill="#c9d9e7"/>
+    <rect x="20" y="480" width="128" height="14" rx="7" fill="#7890a4"/>
+    <path d="M23 70h58M23 205h58" stroke="#8da5b7" stroke-width="8" stroke-linecap="round"/>
+    <rect x="23" y="32" width="22" height="300" rx="10" fill="#e9faff" fill-opacity=".42" stroke="#d6f5ff" stroke-width="4"/>
+    <rect x="28" y="48" width="12" height="154" rx="6" fill="url(#blue)" opacity=".9"/>
+    <g stroke="#a5bed0" stroke-width="2"><path d="M25 82h12M25 106h8M25 130h12M25 154h8M25 178h12M25 226h12M25 250h8M25 274h12"/></g>
+    <path d="M34 332v38m0 0l-12 16m12-16 12 16" stroke="#d8edf8" stroke-width="4" fill="none"/>
+  </g>
+  <!-- test tube rack -->
+  <g transform="translate(110 300)">
+    <rect x="0" y="164" width="310" height="20" rx="8" fill="#b9c8d5"/>
+    <rect x="18" y="70" width="274" height="18" rx="7" fill="#cfdce5"/>
+    <rect x="20" y="84" width="10" height="82" fill="#9daebb"/><rect x="280" y="84" width="10" height="82" fill="#9daebb"/>
+    <g stroke="#e6fbff" stroke-width="5" fill="#e9faff" fill-opacity=".22">
+      <path d="M48 44v98q0 26 22 26t22-26V44z"/><path d="M100 44v98q0 26 22 26t22-26V44z"/><path d="M152 44v98q0 26 22 26t22-26V44z"/><path d="M204 44v98q0 26 22 26t22-26V44z"/>
+    </g>
+    <path d="M53 104v38q0 20 17 20t17-20v-38z" fill="url(#blue)"/><path d="M105 88v54q0 20 17 20t17-20V88z" fill="url(#gold)"/><path d="M157 120v22q0 20 17 20t17-20v-22z" fill="url(#blue)"/><path d="M209 96v46q0 20 17 20t17-20V96z" fill="url(#gold)"/>
+  </g>
+  <!-- erlenmeyer -->
+  <g transform="translate(430 220)" filter="url(#glow)">
+    <path d="M78 12h72v34l-18 22v80l92 175q18 35-22 35H25q-40 0-22-35L96 148V68L78 46z" fill="#e9faff" fill-opacity=".18" stroke="#e1f7ff" stroke-width="7"/>
+    <path d="M39 263h151l35 67q12 22-19 22H21q-31 0-19-22z" fill="url(#blue)" opacity=".9"/>
+    <path d="M54 283q39-22 75 0t77 0" fill="none" stroke="#9af0ff" stroke-width="6"/>
+    <g stroke="#a9d8ec" stroke-width="3"><path d="M142 188h28M142 220h38M142 252h28M142 284h38"/></g>
+  </g>
+  <!-- round flask -->
+  <g transform="translate(560 330)">
+    <path d="M90 0h34v72a88 88 0 1 1-34 0z" fill="#f7fdff" fill-opacity=".19" stroke="#e6f9ff" stroke-width="6"/>
+    <path d="M39 145q68-25 137 0a72 72 0 0 1-137 0z" fill="url(#gold)" opacity=".92"/>
+    <ellipse cx="107" cy="146" rx="68" ry="17" fill="#ffe38e" opacity=".6"/>
+  </g>
+  <!-- decorative molecule -->
+  <g transform="translate(70 88)" stroke="#d8f4ff" stroke-width="7" stroke-linecap="round">
+    <path d="M25 35l70 30m0 0 52-47m-52 47 58 63"/>
+    <circle cx="25" cy="35" r="18" fill="#ffdb4b" stroke="#fff"/><circle cx="95" cy="65" r="20" fill="#39b9e8" stroke="#fff"/><circle cx="147" cy="18" r="15" fill="#ef6767" stroke="#fff"/><circle cx="153" cy="128" r="17" fill="#4ed39d" stroke="#fff"/>
+  </g>
+  <ellipse cx="485" cy="574" rx="345" ry="25" fill="#001c3a" opacity=".25"/>
+</svg>

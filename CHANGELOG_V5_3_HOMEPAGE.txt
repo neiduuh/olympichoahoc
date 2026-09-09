@@ -1,0 +1,20 @@
+V5.3 - GIAO DIỆN TRANG CHỦ THEO NHẬN DIỆN TRƯỜNG
+
+1. Trang chủ:
+- Thêm logo Trường PTDTNT THCS và THPT Vân Canh - Gia Lai.
+- Hiển thị tên trường rõ ràng ở thanh điều hướng và phần giới thiệu.
+- Bỏ phần "Các vòng thi nổi bật / Vòng thi đang mở" khỏi trang chủ.
+- Học sinh chỉ xem vòng thi sau khi đăng nhập vào "Thi của tôi".
+- Thay hình tròn cũ bằng minh họa Hóa học gồm ống nghiệm, buret, bình tam giác, bình cầu và mô hình phân tử.
+- Giữ phần giới thiệu ngắn và 4 giá trị: Kiến thức vững vàng, Tư duy sáng tạo, Kết nối đam mê, Tỏa sáng tài năng.
+
+2. Font chữ:
+- Font mặc định toàn website đổi sang Times New Roman.
+- Các mini game Phaser cũng đổi font canvas sang Times New Roman.
+
+3. Nhận diện website:
+- Logo trường được dùng làm favicon của website.
+- Logo trường xuất hiện trước nhận diện Olympic Hóa học ở trang chủ.
+
+4. Tối ưu Vercel:
+- Trang chủ không còn truy vấn danh sách vòng thi từ database, giúp lần mở trang đầu nhẹ hơn.
