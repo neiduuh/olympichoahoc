@@ -13,7 +13,10 @@ ON_VERCEL = bool(os.environ.get("VERCEL"))
 # from public/static so one repository works on both platforms.
 app = Flask(
     __name__,
-    static_folder=None if ON_VERCEL else "public/static",
+    # Vercel must keep Flask's "static" endpoint because play.html uses
+    # url_for('static', ...) for the mini-game assets. Public homepage assets
+    # are still served directly by Vercel from public/static when present.
+    static_folder="static" if ON_VERCEL else "public/static",
     static_url_path="/static",
 )
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
