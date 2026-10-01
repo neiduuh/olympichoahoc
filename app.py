@@ -5,6 +5,7 @@ import os, json, random, time, base64
 from io import BytesIO
 from openpyxl import Workbook
 from database import db, init_db, backend_name, IS_POSTGRES
+from pdf_question_import import parse_pdf_questions, PdfImportError
 from datetime import datetime
 
 ON_VERCEL = bool(os.environ.get("VERCEL"))
@@ -480,6 +481,79 @@ def admin_question_bank():
     grouped={r["id"]:[] for r in rounds}
     for q in qrows: grouped.setdefault(q["round_id"],[]).append(q)
     return render_template("question_bank.html",rounds=rounds,grouped=grouped)
+
+@app.route("/admin/questions/<int:rid>/pdf-import", methods=["POST"])
+def admin_pdf_import(rid):
+    admin_required()
+    con=db()
+    r=con.execute("SELECT * FROM rounds WHERE id=?",(rid,)).fetchone()
+    if not r:
+        con.close()
+        abort(404)
+
+    game=request.form.get("game_type","").strip()
+    allowed={"bee","racing"}
+    if r["selected_sport"] in ("soccer","basketball"):
+        allowed.add(r["selected_sport"])
+    if game not in allowed:
+        con.close()
+        flash("Mini game không hợp lệ cho vòng thi này.","danger")
+        return redirect(url_for("admin_questions",rid=rid))
+
+    try:
+        result=parse_pdf_questions(request.files.get("pdf_file"),game)
+        questions=result["questions"]
+        replace_existing=request.form.get("replace_existing")=="1"
+
+        if replace_existing:
+            con.execute("DELETE FROM questions WHERE round_id=? AND game_type=?",(rid,game))
+
+        for item in questions:
+            con.execute(
+                """INSERT INTO questions(
+                       round_id,game_type,qtype,content,options_json,correct_json,
+                       points,explanation,image_data
+                   ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                (
+                    rid,item["game"],item["qtype"],item["content"],
+                    json.dumps(item["options"],ensure_ascii=False),
+                    json.dumps(item["correct"],ensure_ascii=False),
+                    item["points"],item.get("explanation",""),None,
+                )
+            )
+        con.commit()
+
+        game_name={
+            "bee":"Đào kho báu",
+            "soccer":"Sút bóng",
+            "basketball":"Ném bóng",
+            "racing":"Lái xe vượt chướng ngại vật",
+        }.get(game,game)
+        msg=f"Đã đọc PDF và nhập {len(questions)} câu cho {game_name}."
+        if replace_existing:
+            msg+=" Bộ câu hỏi cũ của mini game này đã được thay thế."
+        flash(msg,"success")
+
+        skipped=result.get("skipped") or []
+        if skipped:
+            preview=" | ".join(skipped[:4])
+            more=f" (+{len(skipped)-4} lỗi khác)" if len(skipped)>4 else ""
+            flash(f"Có {len(skipped)} câu chưa nhập được: {preview}{more}","danger")
+
+        minimum={"bee":10,"soccer":10,"basketball":10,"racing":2}.get(game,1)
+        if len(questions)<minimum:
+            flash(
+                f"Khuyến nghị mini game này có ít nhất {minimum} câu; hiện PDF chỉ đọc được {len(questions)} câu.",
+                "danger"
+            )
+    except PdfImportError as exc:
+        con.rollback()
+        flash(str(exc),"danger")
+    finally:
+        con.close()
+
+    return redirect(url_for("admin_questions",rid=rid))
+
 
 @app.route("/admin/questions/<int:rid>", methods=["GET","POST"])
 def admin_questions(rid):
