@@ -1,19 +1,13 @@
 import os
 import sqlite3
-import threading
 from datetime import datetime
 
 try:
     import psycopg
     from psycopg.rows import dict_row
-    try:
-        from psycopg_pool import ConnectionPool
-    except Exception:
-        ConnectionPool = None
 except Exception:
     psycopg = None
     dict_row = None
-    ConnectionPool = None
 
 BASE_DIR = os.path.dirname(__file__)
 SQLITE_PATH = os.path.join(BASE_DIR, "olympic.db")
@@ -26,8 +20,6 @@ if ON_RENDER and not DATABASE_URL:
     )
 
 IS_POSTGRES = bool(DATABASE_URL)
-_PG_POOL = None
-_PG_POOL_LOCK = threading.Lock()
 
 
 def _pg_url():
@@ -55,10 +47,9 @@ class CursorWrap:
 
 
 class ConnectionWrap:
-    def __init__(self, raw, postgres=False, pool=None):
+    def __init__(self, raw, postgres=False):
         self.raw = raw
         self.postgres = postgres
-        self.pool = pool
 
     def _sql(self, sql):
         return sql.replace("?", "%s") if self.postgres else sql
@@ -87,53 +78,14 @@ class ConnectionWrap:
         self.raw.rollback()
 
     def close(self):
-        if self.raw is None:
-            return
-        if self.pool is not None:
-            try:
-                self.raw.rollback()
-            except Exception:
-                pass
-            raw, self.raw = self.raw, None
-            self.pool.putconn(raw)
-            return
         self.raw.close()
-
-
-def _postgres_pool():
-    global _PG_POOL
-    if not IS_POSTGRES or ConnectionPool is None:
-        return None
-    if _PG_POOL is None:
-        with _PG_POOL_LOCK:
-            if _PG_POOL is None:
-                max_size=max(1, int(os.environ.get("DB_POOL_MAX", "4")))
-                _PG_POOL=ConnectionPool(
-                    conninfo=_pg_url(),
-                    min_size=0,
-                    max_size=max_size,
-                    timeout=5,
-                    max_idle=120,
-                    max_lifetime=900,
-                    kwargs={
-                        "row_factory": dict_row,
-                        "connect_timeout": 5,
-                        "prepare_threshold": None,
-                    },
-                    open=True,
-                )
-    return _PG_POOL
 
 
 def db():
     if IS_POSTGRES:
         if psycopg is None:
             raise RuntimeError("Thiếu thư viện psycopg. Hãy chạy pip install -r requirements.txt")
-        pool=_postgres_pool()
-        if pool is not None:
-            raw=pool.getconn(timeout=5)
-            return ConnectionWrap(raw, postgres=True, pool=pool)
-        raw = psycopg.connect(_pg_url(), row_factory=dict_row, connect_timeout=5, prepare_threshold=None)
+        raw = psycopg.connect(_pg_url(), row_factory=dict_row, connect_timeout=10, prepare_threshold=None)
         return ConnectionWrap(raw, postgres=True)
     raw = sqlite3.connect(SQLITE_PATH)
     raw.row_factory = sqlite3.Row

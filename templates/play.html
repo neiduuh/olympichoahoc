@@ -40,10 +40,10 @@ const playerName={{(me.full_name or me.username)|tojson}};
 const playerClass={{(me.class_name or '')|tojson}};
 const sport=(grouped.soccer||[]).length ? 'soccer' : ((grouped.basketball||[]).length ? 'basketball' : null);
 window.CHEM_ASSETS={
-  basketballScene: "/static/img/basketball_scene_v49.png",
-  raceRockScene: "/static/img/race_obstacle_rock_v50.png",
-  racePuddleScene: "/static/img/race_obstacle_puddle_v50.png",
-  raceBushScene: "/static/img/race_obstacle_bush_v50.png"
+  basketballScene: {{ url_for('static', filename='img/basketball_scene_v49.png')|tojson }},
+  raceRockScene: {{ url_for('static', filename='img/race_obstacle_rock_v50.png')|tojson }},
+  racePuddleScene: {{ url_for('static', filename='img/race_obstacle_puddle_v50.png')|tojson }},
+  raceBushScene: {{ url_for('static', filename='img/race_obstacle_bush_v50.png')|tojson }}
 };
 const games=[
   ['bee','Đào kho báu','⛏️'],
@@ -89,8 +89,9 @@ function loadExternalScript(src){
 async function ensurePhaserLoaded(){
   if(window.Phaser)return true;
   const sources=[
-    'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js',
+    "{{url_for('static',filename='vendor/phaser.min.js')}}",
     'https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js',
+    'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js',
     'https://unpkg.com/phaser@3.90.0/dist/phaser.min.js'
   ];
   for(const src of sources){
@@ -110,7 +111,7 @@ if(!phaserOK){
   return;
 }
 try{
-  await loadExternalScript("/static/js/phaser-games.js?v=5.5");
+  await loadExternalScript("{{url_for('static',filename='js/phaser-games.js')}}?v=5.0");
 }catch(e){
   fallbackBox.hidden=false;
   fallbackBox.textContent='Đã tải Phaser nhưng không tải được mã mini game. Hãy tải lại trang.';
@@ -411,16 +412,10 @@ async function submitAns(ans){
   const g=games[gi][0],q=grouped[g][qi];
   if(g==='bee'&&!treasure.pending){document.getElementById('feedback').innerHTML='<span class="result-badge warn">CHƯA TỚI Ô ?</span> Hãy di chuyển tới một ô dấu hỏi trước.';return}
   locked=true;clearInterval(timerHandle);disableQuestionControls();
-  const pendingFb=document.getElementById('feedback');
-  if(pendingFb){
-    pendingFb.innerHTML='<span class="result-badge warn">ĐANG CHẤM...</span> Đang xác nhận đáp án';
-  }
-  const requestStarted=performance.now();
   try{
     const res=await fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt_id:attemptId,question_id:q.id,answer:ans})});
     if(!res.ok)throw new Error('Không thể chấm câu trả lời');
     const d=await res.json();
-    console.debug('[V5.5] answer latency',Math.round(performance.now()-requestStarted)+'ms');
     score=Number.isFinite(+d.total_score)?+d.total_score:score+(+d.score||0); scoreEl.textContent=score; if(g==='soccer')window.ChemGames?.updateSoccerScore(score); if(g==='basketball')window.ChemGames?.updateBasketballScore(score); if(g==='bee')window.ChemGames?.updateTreasureScore(treasure.correct);
     detail.push({q:q.id,score:d.score,ok:d.ok,game:g,duplicate:!!d.duplicate});
     const fb=document.getElementById('feedback');

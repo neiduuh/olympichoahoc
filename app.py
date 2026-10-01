@@ -1,5 +1,5 @@
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, Response, send_file, g
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, abort, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 import os, json, random, time, base64
 from io import BytesIO
@@ -13,9 +13,10 @@ ON_VERCEL = bool(os.environ.get("VERCEL"))
 # from public/static so one repository works on both platforms.
 app = Flask(
     __name__,
-    # On Vercel /static/* is served from public/static by the CDN. Keeping the
-    # large legacy static/ folder out of the Python function reduces cold start.
-    static_folder=None if ON_VERCEL else "public/static",
+    # Vercel must keep Flask's "static" endpoint because play.html uses
+    # url_for('static', ...) for the mini-game assets. Public homepage assets
+    # are still served directly by Vercel from public/static when present.
+    static_folder="static" if ON_VERCEL else "public/static",
     static_url_path="/static",
 )
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
@@ -26,25 +27,9 @@ if (not ON_VERCEL) or os.environ.get("VERCEL_INIT_DB") == "1":
     init_db(generate_password_hash(ADMIN_INITIAL_PASSWORD))
 
 def current_user():
-    if hasattr(g, "_current_user"):
-        return g._current_user
-    uid=session.get("uid")
-    if not uid:
-        g._current_user=None
-        return None
-    con=db()
-    try:
-        u=con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    finally:
-        con.close()
-    g._current_user=u
+    if "uid" not in session: return None
+    con=db(); u=con.execute("SELECT * FROM users WHERE id=?", (session["uid"],)).fetchone(); con.close()
     return u
-
-def _session_uid_required():
-    uid=session.get("uid")
-    if not uid:
-        abort(401)
-    return int(uid)
 
 def login_required():
     u=current_user()
@@ -217,72 +202,55 @@ def leaderboard():
 
 @app.route("/play/<int:round_id>")
 def play(round_id):
-    uid=_session_uid_required()
+    u=login_required()
+    if u["role"]!="player" or not u["approved"]: abort(403)
     con=db()
-    try:
-        u=con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-        if not u or u["role"]!="player" or not u["approved"]:
-            abort(403)
-        g._current_user=u
+    r=con.execute("SELECT * FROM rounds WHERE id=? AND active=1",(round_id,)).fetchone()
+    if not r: con.close(); abort(404)
+    if r["grade_group"] not in ("ALL",u["grade_group"]): con.close(); abort(403)
+    qrows=con.execute("SELECT * FROM questions WHERE round_id=?",(round_id,)).fetchall()
+    grouped={"bee":[],"soccer":[],"basketball":[],"racing":[]}
+    for q in qrows:
+        d=dict(q); d["options"]=json.loads(d["options_json"] or "[]")
+        d["image_url"]=url_for("question_image",qid=d["id"]) if d.get("image_data") else None
+        d.pop("image_data",None)
+        d.pop("correct_json",None)  # never send answer to browser
+        grouped.get(d["game_type"],[]).append(d)
 
-        r=con.execute("SELECT * FROM rounds WHERE id=? AND active=1",(round_id,)).fetchone()
-        if not r:
-            abort(404)
-        if r["grade_group"] not in ("ALL",u["grade_group"]):
-            abort(403)
-
-        qrows=con.execute("""
-            SELECT id,round_id,game_type,qtype,content,options_json,points,explanation,
-                   CASE WHEN image_data IS NULL THEN 0 ELSE 1 END AS has_image
-            FROM questions
-            WHERE round_id=?
-        """,(round_id,)).fetchall()
-
-        grouped={"bee":[],"soccer":[],"basketball":[],"racing":[]}
-        for q in qrows:
-            d=dict(q)
-            d["options"]=json.loads(d["options_json"] or "[]")
-            d["image_url"]=url_for("question_image",qid=d["id"]) if d.pop("has_image",0) else None
-            grouped.get(d["game_type"],[]).append(d)
-
-        selected_sport=r["selected_sport"] if r["selected_sport"] in ("soccer","basketball") else None
-        if not selected_sport:
-            selected_sport=random.choice(["soccer","basketball"])
-            con.execute("UPDATE rounds SET selected_sport=? WHERE id=?", (selected_sport, round_id))
-
-        random.shuffle(grouped["bee"])
-        if selected_sport:
-            random.shuffle(grouped[selected_sport])
-            grouped[selected_sport]=grouped[selected_sport][:min(10, len(grouped[selected_sport]))]
-        random.shuffle(grouped["racing"])
-        grouped["racing"]=grouped["racing"][:min(2, len(grouped["racing"]))]
-
-        for game in ("soccer","basketball"):
-            if game != selected_sport:
-                grouped[game]=[]
-
-        started=datetime.now().isoformat(timespec="seconds")
-        cur=con.execute(
-            "INSERT INTO attempts(user_id,round_id,started_at) VALUES(?,?,?) RETURNING id",
-            (uid,round_id,started)
-        )
-        aid=cur.fetchone()["id"]
+    # Mỗi VÒNG THI bốc ngẫu nhiên đúng 1 game thể thao và lưu cố định.
+    # Mọi thí sinh và mọi lần thi lại trong cùng vòng đều dùng cùng loại game thể thao.
+    selected_sport=r["selected_sport"] if r["selected_sport"] in ("soccer","basketball") else None
+    if not selected_sport:
+        selected_sport=random.choice(["soccer","basketball"])
+        con.execute("UPDATE rounds SET selected_sport=? WHERE id=?", (selected_sport, round_id))
         con.commit()
-    except Exception:
-        con.rollback()
-        raise
-    finally:
-        con.close()
+
+    # Chọn số câu đúng theo luật cuộc thi từ ngân hàng câu hỏi admin đã nhập.
+    # Đào kho báu: trộn ngẫu nhiên toàn bộ ngân hàng câu hỏi admin đã nhập.
+    # Mỗi ô ? sử dụng một câu chưa dùng trong lượt thi. Nên có >= 15 câu để có
+    # đủ câu dự phòng khi thí sinh trả lời sai và phải đổi đường.
+    random.shuffle(grouped["bee"])
+    if selected_sport:
+        random.shuffle(grouped[selected_sport])
+        grouped[selected_sport]=grouped[selected_sport][:min(10, len(grouped[selected_sport]))]
+    random.shuffle(grouped["racing"])
+    grouped["racing"]=grouped["racing"][:min(2, len(grouped["racing"]))]
+
+    # Không gửi game thể thao không được chọn xuống trình duyệt.
+    for g in ("soccer","basketball"):
+        if g != selected_sport:
+            grouped[g]=[]
+    con.close()
+    started=datetime.now().isoformat(timespec="seconds")
+    con=db()
+    cur=con.execute("INSERT INTO attempts(user_id,round_id,started_at) VALUES(?,?,?) RETURNING id",(u["id"],round_id,started))
+    aid=cur.fetchone()["id"]; con.commit(); con.close()
     return render_template("play.html", r=r, grouped=grouped, attempt_id=aid)
 
 @app.route("/question-image/<int:qid>")
 def question_image(qid):
-    _session_uid_required()
-    con=db()
-    try:
-        q=con.execute("SELECT image_data FROM questions WHERE id=?",(qid,)).fetchone()
-    finally:
-        con.close()
+    login_required()
+    con=db(); q=con.execute("SELECT image_data FROM questions WHERE id=?",(qid,)).fetchone(); con.close()
     if not q or not q["image_data"]:
         abort(404)
     try:
@@ -291,130 +259,70 @@ def question_image(qid):
         raw=base64.b64decode(encoded)
     except Exception:
         abort(404)
-    return Response(raw,mimetype=mime,headers={"Cache-Control":"private, max-age=86400"})
+    return Response(raw,mimetype=mime,headers={"Cache-Control":"private, max-age=3600"})
 
 @app.route("/api/answer", methods=["POST"])
 def api_answer():
-    uid=_session_uid_required()
+    u=login_required()
     data=request.get_json(force=True)
-    qid=int(data["question_id"])
-    aid=int(data["attempt_id"])
+    qid=int(data["question_id"]); aid=int(data["attempt_id"])
     con=db()
-    try:
-        row=con.execute("""
-            SELECT a.id AS attempt_id,a.server_score,a.finished_at,
-                   q.id AS question_id,q.game_type,q.qtype,q.correct_json,
-                   q.points,q.explanation
-            FROM attempts a
-            JOIN questions q ON q.id=? AND q.round_id=a.round_id
-            WHERE a.id=? AND a.user_id=?
-        """,(qid,aid,uid)).fetchone()
-        if not row or row["finished_at"]:
-            abort(403)
+    a=con.execute("SELECT * FROM attempts WHERE id=? AND user_id=?",(aid,u["id"])).fetchone()
+    q=con.execute("SELECT * FROM questions WHERE id=?",(qid,)).fetchone()
+    if not a or not q or a["finished_at"] or q["round_id"] != a["round_id"]:
+        con.close(); abort(403)
 
-        correct=json.loads(row["correct_json"])
-        ans=data.get("answer")
-        score=0
-        ok=False
-        if row["qtype"]=="short":
-            acceptable=[_normalize_chem_answer(x) for x in (correct if isinstance(correct,list) else [correct])]
-            ok=_normalize_chem_answer(ans) in acceptable
-            if row["game_type"]=="bee":
-                score=min(10,max(0,100-int(row["server_score"] or 0))) if ok else 0
-            else:
-                score=int(row["points"] or 0) if ok else 0
-        elif row["qtype"]=="mcq":
-            ok=str(ans)==str(correct)
-            score=int(row["points"] or 0) if ok else 0
-        elif row["qtype"]=="tf4":
-            truth=[bool(x) for x in correct]
-            got=[bool(x) for x in (ans or [])]
-            n=sum(1 for i,x in enumerate(truth) if i<len(got) and got[i]==x)
-            score={0:0,1:5,2:15,3:25,4:50}[n]
-            ok=(n==4)
-
-        now=datetime.now().isoformat(timespec="seconds")
-        if IS_POSTGRES:
-            saved=con.execute("""
-                WITH ins AS (
-                    INSERT INTO attempt_answers(attempt_id,question_id,score,is_correct,answered_at)
-                    VALUES(?,?,?,?,?)
-                    ON CONFLICT (attempt_id,question_id) DO NOTHING
-                    RETURNING score,is_correct
-                ),
-                upd AS (
-                    UPDATE attempts
-                    SET server_score=server_score+?
-                    WHERE id=? AND user_id=? AND EXISTS (SELECT 1 FROM ins)
-                    RETURNING server_score
-                )
-                SELECT
-                    COALESCE(
-                        (SELECT score FROM ins),
-                        (SELECT score FROM attempt_answers WHERE attempt_id=? AND question_id=?)
-                    ) AS score,
-                    COALESCE(
-                        (SELECT is_correct FROM ins),
-                        (SELECT is_correct FROM attempt_answers WHERE attempt_id=? AND question_id=?)
-                    ) AS is_correct,
-                    COALESCE(
-                        (SELECT server_score FROM upd),
-                        (SELECT server_score FROM attempts WHERE id=? AND user_id=?)
-                    ) AS total_score,
-                    EXISTS(SELECT 1 FROM ins) AS inserted
-            """,(aid,qid,score,1 if ok else 0,now,score,aid,uid,
-                  aid,qid,aid,qid,aid,uid)).fetchone()
-            con.commit()
-            actual_score=int(saved["score"] or 0)
-            actual_ok=bool(saved["is_correct"])
-            total=int(saved["total_score"] or 0)
-            duplicate=not bool(saved["inserted"])
-        else:
-            cur=con.execute("""
-                INSERT OR IGNORE INTO attempt_answers(attempt_id,question_id,score,is_correct,answered_at)
-                VALUES(?,?,?,?,?)
-            """,(aid,qid,score,1 if ok else 0,now))
-            inserted=cur.rowcount>0
-            if inserted:
-                total=con.execute(
-                    "UPDATE attempts SET server_score=server_score+? WHERE id=? AND user_id=? RETURNING server_score",
-                    (score,aid,uid)
-                ).fetchone()["server_score"]
-                actual_score=score
-                actual_ok=ok
-            else:
-                old=con.execute("""
-                    SELECT aa.score,aa.is_correct,a.server_score AS total_score
-                    FROM attempt_answers aa
-                    JOIN attempts a ON a.id=aa.attempt_id
-                    WHERE aa.attempt_id=? AND aa.question_id=? AND a.user_id=?
-                """,(aid,qid,uid)).fetchone()
-                actual_score=int(old["score"] or 0)
-                actual_ok=bool(old["is_correct"])
-                total=int(old["total_score"] or 0)
-            con.commit()
-            duplicate=not inserted
-
-        return jsonify({
-            "ok":actual_ok,
-            "score":actual_score,
-            "total_score":int(total),
-            "duplicate":duplicate,
-            "explanation":row["explanation"] or ""
-        })
-    except Exception:
-        con.rollback()
-        raise
-    finally:
+    # Một câu chỉ được ghi điểm một lần. Nếu trình duyệt gửi lại request do mạng chập chờn,
+    # trả về kết quả đã ghi thay vì cộng điểm lần nữa.
+    old=con.execute("SELECT score,is_correct FROM attempt_answers WHERE attempt_id=? AND question_id=?",(aid,qid)).fetchone()
+    if old:
+        total=con.execute("SELECT server_score FROM attempts WHERE id=?",(aid,)).fetchone()["server_score"]
         con.close()
+        return jsonify({"ok":bool(old["is_correct"]),"score":old["score"],"total_score":total,"duplicate":True,"explanation":q["explanation"] or ""})
+
+    correct=json.loads(q["correct_json"])
+    ans=data.get("answer")
+    score=0; ok=False
+    if q["qtype"]=="short":
+        acceptable=[_normalize_chem_answer(x) for x in (correct if isinstance(correct,list) else [correct])]
+        ok=_normalize_chem_answer(ans) in acceptable
+        if q["game_type"]=="bee":
+            # Đào kho báu: mỗi câu đúng 10 điểm, nhưng tổng điểm của mini game
+            # này không vượt quá 100 điểm kể cả khi người chơi đi đường vòng.
+            prev_row=con.execute("""
+                SELECT COALESCE(SUM(aa.score),0) AS s
+                FROM attempt_answers aa
+                JOIN questions qq ON qq.id=aa.question_id
+                WHERE aa.attempt_id=? AND qq.game_type='bee'
+            """,(aid,)).fetchone()
+            prev_treasure=int(prev_row["s"] or 0)
+            score=min(10,max(0,100-prev_treasure)) if ok else 0
+        else:
+            score=q["points"] if ok else 0
+    elif q["qtype"]=="mcq":
+        ok=str(ans)==str(correct)
+        score=q["points"] if ok else 0
+    elif q["qtype"]=="tf4":
+        truth=[bool(x) for x in correct]
+        got=[bool(x) for x in (ans or [])]
+        n=sum(1 for i,x in enumerate(truth) if i<len(got) and got[i]==x)
+        score={0:0,1:5,2:15,3:25,4:50}[n]
+        ok=(n==4)
+
+    now=datetime.now().isoformat(timespec="seconds")
+    con.execute("INSERT INTO attempt_answers(attempt_id,question_id,score,is_correct,answered_at) VALUES(?,?,?,?,?)",(aid,qid,score,1 if ok else 0,now))
+    con.execute("UPDATE attempts SET server_score=server_score+? WHERE id=?",(score,aid))
+    total=con.execute("SELECT server_score FROM attempts WHERE id=?",(aid,)).fetchone()["server_score"]
+    con.commit(); con.close()
+    return jsonify({"ok":ok,"score":score,"total_score":total,"duplicate":False,"explanation":q["explanation"] or ""})
 
 @app.route("/api/finish", methods=["POST"])
 def api_finish():
-    uid=_session_uid_required()
+    u=login_required()
     data=request.get_json(force=True)
     aid=int(data["attempt_id"])
     con=db()
-    a=con.execute("SELECT * FROM attempts WHERE id=? AND user_id=?",(aid,uid)).fetchone()
+    a=con.execute("SELECT * FROM attempts WHERE id=? AND user_id=?",(aid,u["id"])).fetchone()
     if not a:
         con.close(); abort(403)
     total=int(a["server_score"] or 0)
@@ -427,24 +335,15 @@ def api_finish():
     con.execute("""UPDATE attempts SET score=?,elapsed_seconds=?,violations=?,finished_at=?,detail_json=?
                    WHERE id=? AND user_id=?""",
                 (total,elapsed,violations,datetime.now().isoformat(timespec="seconds"),
-                 json.dumps(data.get("detail",{}),ensure_ascii=False),aid,uid))
+                 json.dumps(data.get("detail",{}),ensure_ascii=False),aid,u["id"]))
     con.commit(); con.close()
     return jsonify({"redirect":url_for("leaderboard",round_id=data["round_id"]),"score":total,"elapsed":elapsed,"violations":violations})
 
 @app.route("/api/violation", methods=["POST"])
 def api_violation():
-    uid=_session_uid_required()
-    data=request.get_json(force=True)
-    aid=int(data["attempt_id"])
-    con=db()
-    try:
-        con.execute(
-            "UPDATE attempts SET violations=violations+1 WHERE id=? AND user_id=? AND finished_at IS NULL",
-            (aid,uid)
-        )
-        con.commit()
-    finally:
-        con.close()
+    u=login_required()
+    data=request.get_json(force=True); aid=int(data["attempt_id"])
+    con=db(); con.execute("UPDATE attempts SET violations=violations+1 WHERE id=? AND user_id=? AND finished_at IS NULL",(aid,u["id"])); con.commit(); con.close()
     return jsonify({"ok":True})
 
 
