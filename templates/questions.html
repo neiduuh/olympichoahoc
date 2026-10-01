@@ -2,6 +2,76 @@
 <div class="admin-page-head"><div><h1>Nhập câu hỏi – {{r.title}}</h1><p class="muted">Câu hỏi trong vòng được sắp theo thứ tự mini game và thứ tự nhập để dễ kiểm tra, chỉnh sửa.</p></div><a class="btn secondary" href="{{url_for('admin_question_bank')}}">📚 Tất cả vòng thi</a></div>
 <div class="card" style="margin-bottom:16px"><b>3 mini game của vòng này:</b> ⛏️ Đào kho báu + {{'⚽ Sút bóng vào lưới' if r.selected_sport=='soccer' else '🏀 Ném bóng vào rổ'}} + 🚗 Lái xe vượt chướng ngại vật.</div>
 <div class="card" style="margin-bottom:16px"><b>Định dạng công thức Hóa học:</b> bôi đen số hoặc dấu điện tích rồi chọn <b>x₂</b> hoặc <b>x²</b>. Ví dụ H₂SO₄, Fe³⁺, NH₄⁺. Nút <b>Aa</b> đưa ký tự về dạng thường.</div>
+<div class="card" style="margin-bottom:16px">
+  <div class="admin-page-head" style="margin-bottom:12px">
+    <div>
+      <h2 style="margin:0 0 6px">📄 Nhập tự động từ PDF</h2>
+      <p class="muted" style="margin:0">Mỗi mini game dùng 1 file PDF riêng. Hệ thống đọc câu hỏi + đáp án và đưa vào ngân hàng; khi thi vẫn bốc ngẫu nhiên như hiện tại.</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <form method="post" enctype="multipart/form-data" action="{{url_for('admin_pdf_import',rid=r.id)}}" class="card" style="margin:0">
+      <input type="hidden" name="game_type" value="bee">
+      <h3 style="margin-top:0">⛏️ PDF 1 – Đào kho báu</h3>
+      <p class="muted">Dạng trả lời ngắn. Mỗi câu đúng 10 điểm.</p>
+      <div class="field"><label>Chọn PDF câu hỏi + đáp án</label><input type="file" name="pdf_file" accept=".pdf,application/pdf" required></div>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="replace_existing" value="1" checked style="width:auto"> Thay toàn bộ câu hỏi Đào kho báu hiện có</label>
+      <button class="btn" style="margin-top:12px">📥 Đọc PDF và nhập câu hỏi</button>
+    </form>
+
+    <form method="post" enctype="multipart/form-data" action="{{url_for('admin_pdf_import',rid=r.id)}}" class="card" style="margin:0">
+      <input type="hidden" name="game_type" value="{{r.selected_sport}}">
+      <h3 style="margin-top:0">{{'⚽ PDF 2 – Sút bóng' if r.selected_sport=='soccer' else '🏀 PDF 2 – Ném bóng'}}</h3>
+      <p class="muted">Dạng trắc nghiệm A/B/C/D. Hệ thống vẫn đảo thứ tự đáp án khi thi.</p>
+      <div class="field"><label>Chọn PDF câu hỏi + đáp án</label><input type="file" name="pdf_file" accept=".pdf,application/pdf" required></div>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="replace_existing" value="1" checked style="width:auto"> Thay toàn bộ câu hỏi mini game thể thao hiện có</label>
+      <button class="btn" style="margin-top:12px">📥 Đọc PDF và nhập câu hỏi</button>
+    </form>
+
+    <form method="post" enctype="multipart/form-data" action="{{url_for('admin_pdf_import',rid=r.id)}}" class="card" style="margin:0">
+      <input type="hidden" name="game_type" value="racing">
+      <h3 style="margin-top:0">🚗 PDF 3 – Lái xe</h3>
+      <p class="muted">Dạng 4 ý a/b/c/d Đúng/Sai.</p>
+      <div class="field"><label>Chọn PDF câu hỏi + đáp án</label><input type="file" name="pdf_file" accept=".pdf,application/pdf" required></div>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="replace_existing" value="1" checked style="width:auto"> Thay toàn bộ câu hỏi Lái xe hiện có</label>
+      <button class="btn" style="margin-top:12px">📥 Đọc PDF và nhập câu hỏi</button>
+    </form>
+  </div>
+
+  <details style="margin-top:16px">
+    <summary><b>📌 Cách trình bày PDF để hệ thống đọc chính xác</b></summary>
+    <div class="grid" style="margin-top:12px">
+      <div>
+        <b>Đào kho báu</b>
+        <pre style="white-space:pre-wrap">Câu 1. Công thức của axit sulfuric là gì?
+Đáp án: H₂SO₄
+
+Câu 2. ...
+Đáp án: ...</pre>
+      </div>
+      <div>
+        <b>Sút bóng / Ném bóng</b>
+        <pre style="white-space:pre-wrap">Câu 1. Chọn đáp án đúng.
+A. ...
+B. ...
+C. ...
+D. ...
+Đáp án: B</pre>
+      </div>
+      <div>
+        <b>Lái xe – Đúng/Sai</b>
+        <pre style="white-space:pre-wrap">Câu 1. Xét các phát biểu:
+a) ...
+b) ...
+c) ...
+d) ...
+Đáp án: a Đúng; b Sai; c Đúng; d Sai</pre>
+      </div>
+    </div>
+    <p class="muted">Cũng có thể đặt một mục <b>ĐÁP ÁN</b> ở cuối PDF và ghi theo số câu. PDF phải có chữ có thể bôi đen/copy; PDF scan ảnh chưa OCR sẽ không đọc tự động được.</p>
+  </details>
+</div>
 <div class="card"><form method="post" id="qform" enctype="multipart/form-data">
 <div class="grid"><div class="field"><label>Mini game</label><select name="game_type" id="game" onchange="syncQuestionType()"><option value="bee">⛏️ Đào kho báu</option>{% if r.selected_sport=='soccer' %}<option value="soccer">⚽ Sút bóng</option>{% else %}<option value="basketball">🏀 Ném bóng</option>{% endif %}<option value="racing">🚗 Lái xe</option></select></div>
 <div class="field"><label>Dạng câu</label><select name="qtype" id="qtype" onchange="showQuestionFields()" disabled><option value="short">Trả lời ngắn</option><option value="mcq">Trắc nghiệm 4 phương án</option><option value="tf4">4 ý đúng/sai</option></select><small class="muted">Chọn mini game ở bên trái, hệ thống sẽ tự chuyển đúng dạng câu: Đào kho báu = trả lời ngắn; Sút bóng/Ném bóng = trắc nghiệm 4 phương án; Lái xe = 4 ý Đúng/Sai.</small></div></div>
