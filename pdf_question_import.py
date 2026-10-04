@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import base64
 import re
 from io import BytesIO
 
 from pypdf import PdfReader
+
+try:
+    import fitz  # PyMuPDF: preserves PDF image/vector positions
+except Exception:
+    fitz = None
 
 
 MAX_PDF_BYTES = 12 * 1024 * 1024
@@ -129,19 +135,21 @@ def _clean_text(value: str) -> str:
     return value.strip()
 
 
-def extract_pdf_text(file_storage) -> str:
+def _read_pdf_bytes(file_storage) -> bytes:
     if not file_storage or not getattr(file_storage, "filename", ""):
         raise PdfImportError("Hãy chọn một file PDF.")
     filename = str(file_storage.filename or "")
     if not filename.lower().endswith(".pdf"):
         raise PdfImportError("File tải lên phải có định dạng .pdf.")
-
     raw = file_storage.read(MAX_PDF_BYTES + 1)
     if len(raw) > MAX_PDF_BYTES:
         raise PdfImportError("PDF tối đa 12 MB.")
     if not raw:
         raise PdfImportError("File PDF rỗng hoặc không đọc được.")
+    return raw
 
+
+def _extract_text_from_bytes(raw: bytes) -> str:
     try:
         reader = PdfReader(BytesIO(raw))
         if reader.is_encrypted:
@@ -167,6 +175,174 @@ def extract_pdf_text(file_storage) -> str:
         )
     return text
 
+
+def _question_line_number(text: str):
+    for pattern in (
+        r"^\s*(?:Câu|Question)\s*(\d{1,4})\s*[\.:)\-]?",
+        r"^\s*(\d{1,4})\s*[\.)]\s+",
+    ):
+        m = re.match(pattern, text or "", re.I)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def _rect_union(rects):
+    if not rects:
+        return None
+    x0 = min(r.x0 for r in rects)
+    y0 = min(r.y0 for r in rects)
+    x1 = max(r.x1 for r in rects)
+    y1 = max(r.y1 for r in rects)
+    return fitz.Rect(x0, y0, x1, y1)
+
+
+def _render_question_figure(page, rect):
+    """Render a PDF figure/diagram to a compact PNG data URI."""
+    if fitz is None or rect is None or rect.is_empty:
+        return None
+    pad = 8
+    clip = fitz.Rect(
+        max(page.rect.x0, rect.x0 - pad),
+        max(page.rect.y0, rect.y0 - pad),
+        min(page.rect.x1, rect.x1 + pad),
+        min(page.rect.y1, rect.y1 + pad),
+    )
+    if clip.width < 18 or clip.height < 18:
+        return None
+
+    # Keep each DB image comfortably under the existing 2.5 MB limit.
+    chosen = None
+    for scale in (2.0, 1.6, 1.3, 1.0, 0.8):
+        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
+        data = pix.tobytes("png")
+        chosen = data
+        if len(data) <= 2_300_000:
+            break
+    if not chosen:
+        return None
+    return "data:image/png;base64," + base64.b64encode(chosen).decode("ascii")
+
+
+def _extract_question_images(raw: bytes):
+    """Map embedded PDF figures to their nearest numbered question.
+
+    We use page geometry rather than plain-text extraction, so raster pictures
+    and most vector diagrams/tables located inside a question can be retained.
+    The current database stores one illustration per question; if a question
+    contains several image objects, their bounding boxes are rendered together.
+    """
+    if fitz is None:
+        return {}, ["Máy chủ chưa có PyMuPDF nên chưa thể tách hình ảnh từ PDF."]
+
+    images = {}
+    warnings = []
+    try:
+        doc = fitz.open(stream=raw, filetype="pdf")
+    except Exception as exc:
+        return {}, [f"Không mở được lớp hình ảnh PDF: {exc}"]
+
+    last_question = None
+    try:
+        for page_index in range(len(doc)):
+            page = doc[page_index]
+            page_dict = page.get_text("dict")
+            starts = []
+
+            # Locate question headings line-by-line with y coordinates.
+            for block in page_dict.get("blocks", []):
+                if block.get("type") != 0:
+                    continue
+                for line in block.get("lines", []):
+                    line_text = "".join(span.get("text", "") for span in line.get("spans", []))
+                    qnum = _question_line_number(line_text)
+                    if qnum is not None:
+                        bbox = line.get("bbox") or block.get("bbox")
+                        if bbox:
+                            starts.append((float(bbox[1]), qnum))
+            starts.sort(key=lambda x: x[0])
+
+            # Figure candidates: embedded raster images.
+            raster_rects = []
+            for block in page_dict.get("blocks", []):
+                if block.get("type") != 1 or not block.get("bbox"):
+                    continue
+                rect = fitz.Rect(block["bbox"])
+                # Ignore tiny icons / bullets / decorative marks.
+                if rect.width >= 24 and rect.height >= 24 and rect.get_area() >= 900:
+                    raster_rects.append(rect)
+
+            # Vector diagrams/tables are not image blocks. Use their drawing
+            # bounding boxes only when no raster image is present in that question.
+            vector_rects = []
+            try:
+                for drawing in page.get_drawings():
+                    rect = fitz.Rect(drawing.get("rect"))
+                    area = rect.get_area()
+                    page_area = max(1, page.rect.get_area())
+                    if (
+                        rect.width >= 28
+                        and rect.height >= 22
+                        and area >= 1100
+                        and area <= page_area * 0.55
+                    ):
+                        vector_rects.append(rect)
+            except Exception:
+                vector_rects = []
+
+            # Build vertical question intervals on this page. A question started
+            # on the previous page may continue before the first heading.
+            intervals = []
+            if last_question is not None and (not starts or starts[0][0] > page.rect.y0 + 30):
+                first_y = starts[0][0] if starts else page.rect.y1
+                intervals.append((page.rect.y0, first_y, last_question))
+            for i, (start_y, qnum) in enumerate(starts):
+                end_y = starts[i + 1][0] if i + 1 < len(starts) else page.rect.y1
+                intervals.append((start_y, end_y, qnum))
+                last_question = qnum
+
+            for y0, y1, qnum in intervals:
+                in_raster = [
+                    r for r in raster_rects
+                    if (r.y0 + r.y1) / 2 >= y0 - 4 and (r.y0 + r.y1) / 2 < y1 + 4
+                ]
+                candidates = in_raster
+                if not candidates:
+                    candidates = [
+                        r for r in vector_rects
+                        if (r.y0 + r.y1) / 2 >= y0 - 4 and (r.y0 + r.y1) / 2 < y1 + 4
+                    ]
+                if not candidates:
+                    continue
+
+                # Ignore very wide separator lines / borders.
+                candidates = [
+                    r for r in candidates
+                    if r.height >= 18 and not (r.width > page.rect.width * 0.92 and r.height < 45)
+                ]
+                if not candidates:
+                    continue
+
+                union = _rect_union(candidates)
+                data_uri = _render_question_figure(page, union)
+                if not data_uri:
+                    continue
+
+                # If the same question spans pages, keep the larger rendered figure.
+                old = images.get(qnum)
+                if old is None or len(data_uri) > len(old):
+                    images[qnum] = data_uri
+    except Exception as exc:
+        warnings.append(f"Có lỗi khi tách một số hình trong PDF: {exc}")
+    finally:
+        doc.close()
+
+    return images, warnings
+
+
+def extract_pdf_text(file_storage) -> str:
+    raw = _read_pdf_bytes(file_storage)
+    return _extract_text_from_bytes(raw)
 
 def _split_answer_section(text: str):
     heading = re.search(
@@ -306,7 +482,9 @@ def parse_pdf_questions(file_storage, game_type: str):
     if game_type not in {"bee", "soccer", "basketball", "racing"}:
         raise PdfImportError("Mini game không hợp lệ.")
 
-    text = extract_pdf_text(file_storage)
+    raw = _read_pdf_bytes(file_storage)
+    text = _extract_text_from_bytes(raw)
+    question_images, image_warnings = _extract_question_images(raw)
     question_text, answer_text = _split_answer_section(text)
     blocks = _split_questions(question_text)
 
@@ -351,6 +529,7 @@ def parse_pdf_questions(file_storage, game_type: str):
                     "correct": answers,
                     "points": points,
                     "explanation": explanation,
+                    "image_data": question_images.get(qnum),
                 }
             )
             continue
@@ -378,6 +557,7 @@ def parse_pdf_questions(file_storage, game_type: str):
                     "correct": correct,
                     "points": points,
                     "explanation": explanation,
+                    "image_data": question_images.get(qnum),
                 }
             )
             continue
@@ -402,6 +582,7 @@ def parse_pdf_questions(file_storage, game_type: str):
                 "correct": answer,
                 "points": points,
                 "explanation": explanation,
+                "image_data": question_images.get(qnum),
             }
         )
 
@@ -413,4 +594,6 @@ def parse_pdf_questions(file_storage, game_type: str):
         "questions": parsed,
         "skipped": skipped,
         "text_length": len(text),
+        "image_count": sum(1 for q in parsed if q.get("image_data")),
+        "image_warnings": image_warnings,
     }
