@@ -575,21 +575,20 @@
       }).setDepth(6);
       // Measure the rendered text and shrink only when necessary. This avoids
       // overflow without cutting the question or changing the game animation.
-      const maxQuestionHeight=118;
-      while(qText.height>maxQuestionHeight && qFs>11){
+      const maxQuestionHeight=130;
+      while(qText.height>maxQuestionHeight && qFs>9){
         qFs-=1;
         qText.setFontSize(qFs);
       }
-      const boardH=Math.max(126,Math.min(174,qText.height+58));
+      const boardH=Math.max(126,Math.min(190,qText.height+58));
       this.add.rectangle(boardX,boardY,boardW,boardH,0x4b5661,.94)
         .setOrigin(0).setStrokeStyle(4,0xffffff,.38).setDepth(5);
       this.add.text(196,24,'CÂU '+String(o.question||1)+'/'+String(o.total||10),{
         fontFamily:'Times New Roman, Times, serif',
         fontSize:'14px',fontStyle:'bold',color:'#ffe7a7'
       }).setDepth(6);
-      // If the question is extremely long, clip to the visual board rather than
-      // letting it cover the hoop/answers. Normal questions are fully visible.
-      qText.setCrop(0,0,questionW,Math.min(qText.height,maxQuestionHeight));
+      // qText is measured above and reduced until its full rendered height
+      // stays inside the question board; no line of the question is clipped.
 
       // left info panel
       const panelX=10,panelW=150;
