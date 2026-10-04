@@ -10,6 +10,112 @@ MAX_PDF_BYTES = 12 * 1024 * 1024
 MAX_IMPORTED_QUESTIONS = 300
 
 
+_SUBSCRIPT = str.maketrans({
+    "0":"₀","1":"₁","2":"₂","3":"₃","4":"₄",
+    "5":"₅","6":"₆","7":"₇","8":"₈","9":"₉",
+})
+_SUPERSCRIPT = str.maketrans({
+    "0":"⁰","1":"¹","2":"²","3":"³","4":"⁴",
+    "5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹",
+    "+":"⁺","-":"⁻",
+})
+_ELEMENT_SYMBOLS = sorted(
+    {
+        "H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar",
+        "K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr",
+        "Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe",
+        "Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu",
+        "Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn","Fr","Ra",
+        "Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr","Rf","Db",
+        "Sg","Bh","Hs","Mt","Ds","Rg","Cn","Nh","Fl","Mc","Lv","Ts","Og"
+    },
+    key=len,
+    reverse=True,
+)
+_ELEMENT_RE = "(?:" + "|".join(map(re.escape, _ELEMENT_SYMBOLS)) + ")"
+_FORMULA_TOKEN_RE = re.compile(
+    r"(?<![A-Za-zÀ-ỹ])"
+    r"((?:\d+)?(?:" + _ELEMENT_RE + r"|[()\[\]]|\d+)+(?:\^?\d*[+-])?)"
+    r"(?![A-Za-zÀ-ỹ])"
+)
+
+
+def _format_formula_token(token: str) -> str:
+    """Convert flattened chemical notation to Unicode sub/superscripts.
+
+    PDF text extraction often turns H₂SO₄ into H2SO4 and Fe³⁺ into Fe3+.
+    Unicode scripts survive JSON, HTML and Phaser canvas consistently, so the
+    imported question keeps chemistry notation visually close to the source PDF.
+    """
+    if not token or not (re.search(r"\d", token) or re.search(r"[+-]$", token)):
+        return token
+
+    # Explicit charge notation such as SO4^2-.
+    explicit_charge = re.search(r"\^(\d*)([+-])$", token)
+    charge = ""
+    if explicit_charge:
+        digits, sign = explicit_charge.groups()
+        token = token[: explicit_charge.start()]
+        charge = digits.translate(_SUPERSCRIPT) + sign.translate(_SUPERSCRIPT)
+    else:
+        trailing = re.search(r"(\d*)([+-])$", token)
+        if trailing:
+            digits, sign = trailing.groups()
+            core = token[: trailing.start()]
+            token = core
+
+            if digits:
+                # Fe3+ / Al3+ -> monatomic ionic charge.
+                if re.fullmatch(_ELEMENT_RE, core):
+                    charge = digits.translate(_SUPERSCRIPT) + sign.translate(_SUPERSCRIPT)
+                # [Fe(CN)6]4- -> charge after a closed complex.
+                elif core.endswith("]") or core.endswith(")"):
+                    charge = digits.translate(_SUPERSCRIPT) + sign.translate(_SUPERSCRIPT)
+                # SO42- / PO43- are common flattened forms of SO₄²⁻ / PO₄³⁻.
+                elif len(digits) >= 2:
+                    token = core + digits[:-1]
+                    charge = digits[-1].translate(_SUPERSCRIPT) + sign.translate(_SUPERSCRIPT)
+                else:
+                    # NH4+ / H3O+ -> digit remains stoichiometric subscript.
+                    token = core + digits
+                    charge = sign.translate(_SUPERSCRIPT)
+            else:
+                charge = sign.translate(_SUPERSCRIPT)
+
+    # Keep a leading stoichiometric coefficient normal; convert digits that
+    # follow an element/group to subscripts.
+    out = []
+    i = 0
+    while i < len(token):
+        ch = token[i]
+        if ch.isdigit():
+            j = i
+            while j < len(token) and token[j].isdigit():
+                j += 1
+            digits = token[i:j]
+            prev = token[i - 1] if i > 0 else ""
+            if i > 0 and (prev.isalpha() or prev in ")]"):
+                out.append(digits.translate(_SUBSCRIPT))
+            else:
+                out.append(digits)
+            i = j
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out) + charge
+
+
+def format_chemical_notation(value: str) -> str:
+    """Restore common chemistry sub/superscripts after PDF extraction.
+
+    Existing Unicode subscripts/superscripts are preserved. Only tokens that
+    look like chemical formulae are transformed, so ordinary numbers such as
+    years, temperatures and question numbers remain unchanged.
+    """
+    text = value or ""
+    return _FORMULA_TOKEN_RE.sub(lambda m: _format_formula_token(m.group(1)), text)
+
+
 class PdfImportError(ValueError):
     pass
 
@@ -221,13 +327,17 @@ def parse_pdf_questions(file_storage, game_type: str):
     skipped = []
     for qnum, raw_block in blocks:
         block, inline_answer, explanation = _extract_inline_answer(raw_block)
+        block = format_chemical_notation(block)
+        explanation = format_chemical_notation(explanation)
+        if inline_answer is not None:
+            inline_answer = format_chemical_notation(inline_answer)
 
         if qtype == "short":
             answer = inline_answer if inline_answer is not None else key.get(qnum)
             if not answer:
                 skipped.append(f"Câu {qnum}: không tìm thấy đáp án.")
                 continue
-            answers = [x.strip() for x in str(answer).split("|") if x.strip()]
+            answers = [format_chemical_notation(x.strip()) for x in str(answer).split("|") if x.strip()]
             if not answers:
                 skipped.append(f"Câu {qnum}: đáp án rỗng.")
                 continue
@@ -256,6 +366,8 @@ def parse_pdf_questions(file_storage, game_type: str):
                 skipped.append(f"Câu {qnum}: đáp án phải là A, B, C hoặc D.")
                 continue
             correct = str("ABCD".index(letter_match.group(1).upper()))
+            stem = format_chemical_notation(stem)
+            options = [format_chemical_notation(x) for x in options]
             parsed.append(
                 {
                     "number": qnum,
@@ -278,6 +390,8 @@ def parse_pdf_questions(file_storage, game_type: str):
         if answer is None:
             skipped.append(f"Câu {qnum}: không nhận ra 4 đáp án Đúng/Sai.")
             continue
+        stem = format_chemical_notation(stem)
+        statements = [format_chemical_notation(x) for x in statements]
         parsed.append(
             {
                 "number": qnum,
