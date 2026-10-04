@@ -5,7 +5,7 @@ import os, json, random, time, base64
 from io import BytesIO
 from openpyxl import Workbook
 from database import db, init_db, backend_name, IS_POSTGRES
-from pdf_question_import import parse_pdf_questions, PdfImportError
+from pdf_question_import import parse_pdf_questions, PdfImportError, format_chemical_notation
 from datetime import datetime
 
 ON_VERCEL = bool(os.environ.get("VERCEL"))
@@ -243,7 +243,15 @@ def play(round_id):
         grouped={"bee":[],"soccer":[],"basketball":[],"racing":[]}
         for q in qrows:
             d=dict(q)
-            d["options"]=json.loads(d["options_json"] or "[]")
+            # Also format legacy/imported questions at display time so PDFs
+            # uploaded before this fix immediately regain H₂SO₄ / Fe³⁺ style
+            # without requiring the admin to re-upload the file.
+            d["content"]=format_chemical_notation(d.get("content") or "")
+            d["options"]=[
+                format_chemical_notation(x)
+                for x in json.loads(d["options_json"] or "[]")
+            ]
+            d["explanation"]=format_chemical_notation(d.get("explanation") or "")
             d["image_url"]=url_for("question_image",qid=d["id"]) if d.pop("has_image",0) else None
             grouped.get(d["game_type"],[]).append(d)
 
@@ -310,7 +318,7 @@ def api_answer():
     if old:
         total=int(row["server_score"] or 0)
         con.close()
-        return jsonify({"ok":bool(old["is_correct"]),"score":old["score"],"total_score":total,"duplicate":True,"explanation":row["explanation"] or ""})
+        return jsonify({"ok":bool(old["is_correct"]),"score":old["score"],"total_score":total,"duplicate":True,"explanation":format_chemical_notation(row["explanation"] or "")})
 
     correct=json.loads(row["correct_json"])
     ans=data.get("answer")
@@ -345,7 +353,7 @@ def api_answer():
     con.execute("INSERT INTO attempt_answers(attempt_id,question_id,score,is_correct,answered_at) VALUES(?,?,?,?,?)",(aid,qid,score,1 if ok else 0,now))
     total=con.execute("UPDATE attempts SET server_score=server_score+? WHERE id=? AND user_id=? RETURNING server_score",(score,aid,uid)).fetchone()["server_score"]
     con.commit(); con.close()
-    return jsonify({"ok":ok,"score":score,"total_score":total,"duplicate":False,"explanation":row["explanation"] or ""})
+    return jsonify({"ok":ok,"score":score,"total_score":total,"duplicate":False,"explanation":format_chemical_notation(row["explanation"] or "")})
 
 @app.route("/api/treasure-complete", methods=["POST"])
 def api_treasure_complete():
