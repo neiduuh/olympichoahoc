@@ -143,137 +143,147 @@
       this.mode='treasure';
       this.refs.treasureBusy=false;
       this.refs.onTreasureMove=o.onMove||null;
+
       const state=o.state||{};
-      const cols=8, rows=7, cell=48;
-      const board={x:250,y:96,cols,rows,cell,w:cols*cell,h:rows*cell};
-      this.refs.treasureBoard=board;
-      this.refs.treasurePos=state.position||{c:0,r:6};
-      this.refs.treasureGoal=state.goal||{c:6,r:2};
-      this.refs.treasureOpened=new Set(state.opened||[]);
-      this.refs.treasureRocks=new Set(state.rocks||[]);
-      const key=(c,r)=>`${c},${r}`;
-      const center=(c,r)=>({x:board.x+c*cell+cell/2,y:board.y+r*cell+cell/2});
-      this.refs.treasureCellCenter=center;
+      const routeDefs=[
+        {id:'mountain',name:'ĐƯỜNG NÚI ĐÁ',icon:'⛰',color:0xe9ad49,ys:[154,126,158,128,164]},
+        {id:'cave',name:'ĐƯỜNG HANG BÍ MẬT',icon:'◆',color:0x64b9de,ys:[254,232,266,236,258]},
+        {id:'forest',name:'ĐƯỜNG RỪNG CỔ',icon:'♣',color:0x6fc46a,ys:[354,380,346,378,344]}
+      ];
+      const routeState=new Map((state.paths||[]).map(p=>[p.id,p]));
+      const xs=[342,432,522,612,702];
+      const start={x:250,y:254};
+      const chest={x:824,y:254};
+      const nodeCenter=(pathId,step)=>{
+        const def=routeDefs.find(p=>p.id===pathId)||routeDefs[1];
+        return {x:xs[Math.max(0,Math.min(4,step))],y:def.ys[Math.max(0,Math.min(4,step))]};
+      };
+      this.refs.treasureStart=start;
+      this.refs.treasureChest=chest;
+      this.refs.treasureNodeCenter=nodeCenter;
+      this.refs.treasureActivePath=state.activePath||null;
 
-      // outdoor background
-      this.addSky(0x73d6fb,0xd2f5ff);
-      const bg=this.add.graphics();
-      bg.fillStyle(0x78bf55,1); bg.fillRect(0,390,W,110);
-      bg.fillStyle(0x5fa94a,1); bg.fillRect(0,445,W,55);
-      for(let i=0;i<13;i++){
-        const x=20+i*75; bg.fillStyle(i%2?0xffe26a:0xff8dad,1); bg.fillCircle(x,420+(i%3)*16,4); bg.fillStyle(0xffffff,.9); bg.fillCircle(x+5,421+(i%3)*16,3);
+      const sky=this.add.graphics();
+      const top=Phaser.Display.Color.IntegerToColor(0x63c7ee),bottom=Phaser.Display.Color.IntegerToColor(0xd8f4ff);
+      for(let i=0;i<16;i++){
+        const col=Phaser.Display.Color.Interpolate.ColorWithColor(top,bottom,15,i);
+        sky.fillStyle(Phaser.Display.Color.GetColor(col.r,col.g,col.b),1);
+        sky.fillRect(0,i*32,W,33);
+      }
+      sky.fillStyle(0x5bb65a,1);sky.fillRect(0,365,W,135);
+      sky.fillStyle(0x397f43,1);sky.fillRect(0,438,W,62);
+      this.add.circle(870,72,42,0xffdf64,.96);
+
+      for(let i=0;i<12;i++){
+        const x=18+i*86,y=390+(i%3)*12;
+        sky.fillStyle(0x2f713b,.9);sky.fillRect(x-3,y-34,6,35);
+        sky.fillStyle(i%2?0x3d964b:0x4ca956,1);sky.fillCircle(x,y-44,18+(i%3)*3);
+        sky.fillCircle(x-13,y-38,12);sky.fillCircle(x+13,y-38,12);
       }
 
-      // title and side panels
-      this.add.rectangle(250,18,384,60,0x24374a,.96).setOrigin(0).setStrokeStyle(3,0xf0d08b,.95);
-      this.add.text(442,32,'⛏️ ĐÀO KHO BÁU',{fontFamily:'Arial',fontSize:'26px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5,0);
-      this.add.text(442,61,'Đi tới ô ? • Trả lời đúng để đào đường',{fontFamily:'Arial',fontSize:'13px',color:'#dceeff'}).setOrigin(.5,0);
-
-      const panelX=18,panelW=190;
-      this.add.rectangle(panelX,76,panelW,116,0x25384a,.96).setOrigin(0).setStrokeStyle(3,0xf0d08b,.9);
-      this.add.circle(panelX+48,113,26,0xeef7ff,1).setStrokeStyle(3,0xffffff,.8);
-      this.add.circle(panelX+48,109,10,0xa8b7c5,1); this.add.ellipse(panelX+48,137,38,23,0xa8b7c5,1);
+      this.add.rectangle(18,78,188,310,0x162b3a,.96).setOrigin(0).setStrokeStyle(3,0xe9c878,.9);
+      this.add.text(112,94,'⛏️ THỢ SĂN KHO BÁU',{fontFamily:'Arial',fontSize:'16px',fontStyle:'bold',color:'#fff5cc'}).setOrigin(.5);
+      this.add.circle(62,140,28,0xeaf6ff,1).setStrokeStyle(3,0xffffff,.75);
+      this.add.image(62,143,'minerTex').setScale(.43);
       const pname=String(o.playerName||'Thí sinh');
-      this.add.text(panelX+91,96,pname.length>18?pname.slice(0,17)+'…':pname,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'});
-      this.add.text(panelX+91,121,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'12px',color:'#d9edf9'});
-      this.add.text(panelX+91,148,`Điểm game: ${Math.min(100,state.gameScore||0)}/100`,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#ffd84b'});
+      this.add.text(103,128,pname.length>14?pname.slice(0,13)+'…':pname,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#ffffff'});
+      this.add.text(103,148,o.className?'Lớp '+o.className:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'11px',color:'#cce5f2'});
 
-      this.add.rectangle(panelX,203,panelW,78,0x25384a,.96).setOrigin(0).setStrokeStyle(3,0xf0d08b,.9);
-      this.add.text(panelX+14,216,'⏱ THỜI GIAN',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#eaf7ff'});
-      this.refs.treasureTimer=this.add.text(panelX+95,252,this.formatSoccerTime(o.timeLeft??1200),{...labelStyle(27,'#ffd844'),strokeThickness:2}).setOrigin(.5);
-      this.add.rectangle(panelX,292,panelW,92,0x25384a,.96).setOrigin(0).setStrokeStyle(3,0xf0d08b,.9);
-      this.add.text(panelX+14,305,'💎 ĐÃ ĐÀO ĐÚNG',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#eaf7ff'});
-      this.refs.treasureScore=this.add.text(panelX+95,347,`${Math.min(10,state.correct||0)}/10`,{...labelStyle(31,'#ffd844'),strokeThickness:2}).setOrigin(.5);
+      this.add.text(34,184,'ĐIỂM CÂU HỎI',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#d9edf8'});
+      this.refs.treasureScore=this.add.text(112,213,String(Math.min(70,state.gameScore||0))+'/70',{...labelStyle(28,'#ffd84b'),strokeThickness:2}).setOrigin(.5);
+      this.add.text(34,240,'⏱ THỜI GIAN',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#d9edf8'});
+      this.refs.treasureTimer=this.add.text(112,270,this.formatSoccerTime(o.timeLeft??1200),{...labelStyle(25,'#8ee9ff'),strokeThickness:2}).setOrigin(.5);
+      this.add.text(34,300,'LUẬT CHƠI',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#ffd991'});
+      this.add.text(34,322,'• 3 đường • 5 chặng/đường\n• Đúng mở đường, sai bị chặn\n• Điểm câu hỏi tối đa 70\n• Tới kho báu = đủ 100 điểm',{fontFamily:'Arial',fontSize:'11px',color:'#edf8ff',lineSpacing:4});
 
-      // wooden board
-      bg.fillStyle(0x95602f,1); bg.fillRoundedRect(board.x-16,board.y-16,board.w+32,board.h+32,12);
-      bg.fillStyle(0x6e431f,1); bg.fillRoundedRect(board.x-9,board.y-9,board.w+18,board.h+18,9);
-      bg.fillStyle(0x4c2d18,1); bg.fillRect(board.x,board.y,board.w,board.h);
-      bg.lineStyle(2,0x795033,.76);
-      for(let c=0;c<=cols;c++){bg.beginPath();bg.moveTo(board.x+c*cell,board.y);bg.lineTo(board.x+c*cell,board.y+board.h);bg.strokePath();}
-      for(let r=0;r<=rows;r++){bg.beginPath();bg.moveTo(board.x,board.y+r*cell);bg.lineTo(board.x+board.w,board.y+r*cell);bg.strokePath();}
+      this.add.rectangle(225,18,660,52,0x172c3d,.96).setOrigin(0).setStrokeStyle(3,0xf0cc76,.9);
+      this.add.text(555,30,'🏴‍☠️ BẢN ĐỒ ĐÀO KHO BÁU',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5,0);
+      this.add.text(555,57,'Chọn 1 trong 3 con đường • vượt 5 dấu ? để tới rương',{fontFamily:'Arial',fontSize:'12px',color:'#d8ecf7'}).setOrigin(.5,0);
 
-      const pos=this.refs.treasurePos, goal=this.refs.treasureGoal;
-      const dirs={up:[0,-1,'↑'],down:[0,1,'↓'],left:[-1,0,'←'],right:[1,0,'→']};
-      const adjacent=new Set();
-      Object.values(dirs).forEach(([dc,dr])=>{const c=pos.c+dc,r=pos.r+dr;if(c>=0&&c<cols&&r>=0&&r<rows)adjacent.add(key(c,r));});
+      this.add.rectangle(222,84,690,348,0xd8b978,1).setOrigin(0).setStrokeStyle(5,0x6d4927,1);
+      this.add.rectangle(232,94,670,328,0xe7ca91,1).setOrigin(0).setStrokeStyle(2,0xb28b50,.85);
+      const mapG=this.add.graphics();
+      mapG.fillStyle(0xb79055,.16);
+      for(let i=0;i<45;i++) mapG.fillCircle(242+Math.random()*648,104+Math.random()*308,1+Math.random()*2);
 
-      // draw cells: rocks, opened tunnel, nearby ? cells, hidden earth
-      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
-        const k=key(c,r), pt=center(c,r), isGoal=(c===goal.c&&r===goal.r), isPos=(c===pos.c&&r===pos.r);
-        if(this.refs.treasureRocks.has(k)){
-          this.drawTreasureRock(pt.x,pt.y,22);
-          continue;
+      mapG.lineStyle(14,0x6bbce0,.35);
+      mapG.beginPath();mapG.moveTo(250,205);mapG.lineTo(330,214);mapG.lineTo(390,202);mapG.lineTo(470,216);mapG.strokePath();
+      mapG.fillStyle(0x94724e,.5);
+      for(let x=280;x<860;x+=120){mapG.fillTriangle(x,108,x+24,86,x+48,108);}
+
+      routeDefs.forEach(def=>{
+        const st=routeState.get(def.id)||{step:0,blocked:false,blockedAt:null};
+        const pts=[start,...def.ys.map((y,i)=>({x:xs[i],y})),chest];
+        mapG.lineStyle(14,0x5f452d,.42);
+        for(let i=0;i<pts.length-1;i++)mapG.lineBetween(pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y);
+        for(let i=0;i<pts.length-1;i++){
+          const dim=st.blocked && st.blockedAt!==null && i>=st.blockedAt;
+          mapG.lineStyle(8,dim?0x7c7469:def.color,dim?.25:.84);
+          mapG.lineBetween(pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y);
         }
-        if(isGoal){
-          this.drawTreasureChest(pt.x,pt.y,state.finished===true);
-          if(adjacent.has(k)){
-            const hit=this.add.rectangle(pt.x,pt.y,cell-4,cell-4,0xffffff,0.001).setDepth(12).setInteractive({useHandCursor:true});
-            hit.on('pointerdown',()=>this.triggerTreasureMove({c,r,key:k,type:'treasure'}));
+        this.add.text(263,def.ys[0]-28,def.icon+' '+def.name,{fontFamily:'Arial',fontSize:'10px',fontStyle:'bold',color:'#4a341f'}).setOrigin(0,.5);
+      });
+
+      mapG.fillStyle(0xb35f33,1);mapG.fillTriangle(start.x-18,start.y+18,start.x,start.y-20,start.x+18,start.y+18);
+      mapG.fillStyle(0xf2d7a5,1);mapG.fillTriangle(start.x-11,start.y+18,start.x,start.y-10,start.x+11,start.y+18);
+      this.add.text(start.x,start.y+30,'XUẤT PHÁT',{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#5c3d21'}).setOrigin(.5);
+
+      this.drawTreasureChest(chest.x,chest.y,state.finished===true);
+
+      routeDefs.forEach(def=>{
+        const st=routeState.get(def.id)||{step:0,blocked:false,blockedAt:null};
+        for(let step=0;step<5;step++){
+          const p=nodeCenter(def.id,step);
+          const isDone=step<Number(st.step||0);
+          const isBlocked=!!st.blocked && Number(st.blockedAt)===step;
+          const isNext=!st.blocked && step===Number(st.step||0);
+          const canChoose=!state.activePath && isNext;
+          const canContinue=state.activePath===def.id && isNext;
+          const clickable=(canChoose||canContinue) && !state.finished;
+
+          if(isBlocked){
+            this.drawTreasureRock(p.x,p.y,20);
+            this.add.text(p.x,p.y+28,'BỊ CHẶN',{fontFamily:'Arial',fontSize:'8px',fontStyle:'bold',color:'#7b2828'}).setOrigin(.5);
+            continue;
           }
-          continue;
-        }
-        if(this.refs.treasureOpened.has(k)){
-          const floor=this.add.rectangle(pt.x,pt.y,cell-7,cell-7,0x76502d,.5).setStrokeStyle(2,0xb58a55,.55).setDepth(3);
-          if(!isPos)this.add.circle(pt.x,pt.y,6,0x4bd18d,.85).setDepth(4);
-          if(adjacent.has(k) && !isPos){
-            floor.setInteractive({useHandCursor:true});
-            floor.on('pointerover',()=>floor.setFillStyle(0x8e6a42,.7));
-            floor.on('pointerout',()=>floor.setFillStyle(0x76502d,.5));
-            floor.on('pointerdown',()=>this.triggerTreasureMove({c,r,key:k,type:'open'}));
+          if(isDone){
+            this.add.circle(p.x,p.y,20,0x2f9a62,1).setStrokeStyle(3,0xe9ffe6,.9).setDepth(8);
+            this.add.text(p.x,p.y-1,'✓',{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
+            continue;
           }
-          continue;
-        }
-        if(adjacent.has(k)){
-          const sq=this.add.rectangle(pt.x,pt.y,39,39,0x9d221f,1).setStrokeStyle(3,0xd49a54,1).setDepth(8);
-          const q=this.add.text(pt.x,pt.y-2,'?',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
-          const gem=this.add.circle(pt.x+12,pt.y+12,6,0x48d4ff,1).setStrokeStyle(2,0xffffff,.8).setDepth(10);
-          const target={c,r,key:k,type:'question'};
-          sq.setInteractive({useHandCursor:true});
-          sq.on('pointerover',()=>{if(!this.refs.treasureBusy){sq.setScale(1.08);q.setScale(1.08);gem.setScale(1.08);}});
-          sq.on('pointerout',()=>{sq.setScale(1);q.setScale(1);gem.setScale(1);});
-          sq.on('pointerdown',()=>this.triggerTreasureMove(target));
-          continue;
-        }
-        // unexplored earth: subtle darker tile
-        this.add.rectangle(pt.x,pt.y,cell-6,cell-6,0x3f2514,.22).setDepth(1);
-      }
 
-      // player miner
-      const ppt=center(pos.c,pos.r);
-      this.refs.treasureHome={x:ppt.x,y:ppt.y};
-      const halo=this.add.circle(ppt.x,ppt.y,25,0xffdc53,.2).setStrokeStyle(3,0xffec8d,.92).setDepth(20);
-      this.tweens.add({targets:halo,scale:1.18,alpha:.07,duration:650,yoyo:true,repeat:-1});
-      this.refs.treasureHalo=halo;
-      const miner=this.add.image(ppt.x,ppt.y-3,'minerTex').setScale(.72).setDepth(24);
-      this.refs.miner=miner;
-      this.add.text(ppt.x,ppt.y+29,'BẠN',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#fff3a6',stroke:'#58361b',strokeThickness:3}).setOrigin(.5).setDepth(25);
-
-      // right control panel
-      this.add.rectangle(677,108,255,270,0x1e3345,.94).setOrigin(0).setStrokeStyle(3,0xf0d08b,.8);
-      this.add.text(804,127,'DI CHUYỂN',{fontFamily:'Arial',fontSize:'18px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-      this.add.text(804,151,'Bấm ô liền kề hoặc nút mũi tên',{fontFamily:'Arial',fontSize:'12px',color:'#cae5f5'}).setOrigin(.5);
-      const bx=804,by=228;
-      const positions={up:[bx,by-58],left:[bx-58,by],right:[bx+58,by],down:[bx,by+58]};
-      Object.entries(dirs).forEach(([dir,[dc,dr,symbol]])=>{
-        const tc=pos.c+dc,tr=pos.r+dr; const valid=tc>=0&&tc<cols&&tr>=0&&tr<rows;
-        const k=key(tc,tr); const blocked=!valid || this.refs.treasureRocks.has(k);
-        const [x,y]=positions[dir];
-        const b=this.add.rectangle(x,y,50,46,blocked?0x56616a:0x0e658d,.98).setStrokeStyle(2,blocked?0x849099:0xbceeff,1).setDepth(30);
-        const t=this.add.text(x,y-1,blocked?'×':symbol,{fontFamily:'Arial',fontSize:'25px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(31);
-        if(!blocked){
-          const target={c:tc,r:tr,key:k,type:(tc===goal.c&&tr===goal.r)?'treasure':(this.refs.treasureOpened.has(k)?'open':'question')};
-          b.setInteractive({useHandCursor:true});
-          b.on('pointerover',()=>{if(!this.refs.treasureBusy){b.setScale(1.08);t.setScale(1.08);}});
-          b.on('pointerout',()=>{b.setScale(1);t.setScale(1);});
-          b.on('pointerdown',()=>this.triggerTreasureMove(target));
+          const fill=clickable?0xb32f2b:0x8a6a46;
+          const alpha=clickable?1:.64;
+          const ring=this.add.circle(p.x,p.y,20,fill,alpha).setStrokeStyle(3,clickable?0xffdf70:0xd7bd8f,.95).setDepth(8);
+          const qm=this.add.text(p.x,p.y-1,'?',{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
+          this.add.text(p.x,p.y+28,String(step+1),{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#5a3e23'}).setOrigin(.5);
+          if(clickable){
+            this.tweens.add({targets:ring,scale:1.15,alpha:.72,duration:620,yoyo:true,repeat:-1});
+            ring.setInteractive({useHandCursor:true});
+            ring.on('pointerover',()=>{ring.setScale(1.22);qm.setScale(1.12);});
+            ring.on('pointerout',()=>{ring.setScale(1);qm.setScale(1);});
+            ring.on('pointerdown',()=>this.triggerTreasureMove({pathId:def.id,step:step,key:def.id+':'+step,type:'question'}));
+          }
         }
       });
-      this.add.text(804,337,`Đường bị đá chặn: ${state.failedRockCount||0}`,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#ffd7d7'}).setOrigin(.5);
-      this.add.text(804,359,'Đến kho báu = kết thúc mini game',{fontFamily:'Arial',fontSize:'12px',color:'#d8ebf7'}).setOrigin(.5);
 
-      this.add.rectangle(235,449,430,35,0x172a38,.78).setOrigin(0).setStrokeStyle(2,0xffffff,.1);
-      this.add.text(450,467,'Ô ? chỉ hiện khi ở cạnh bạn. Trả lời sai → ô đó hóa đá và không thể đi qua.',{fontFamily:'Arial',fontSize:'12px',color:'#e9f7ff'}).setOrigin(.5);
+      let playerPos=start;
+      if(state.position?.pathId && Number(state.position.step)>=0){
+        playerPos=nodeCenter(state.position.pathId,Number(state.position.step));
+      }
+      this.refs.treasureHome={x:start.x,y:start.y};
+      const halo=this.add.circle(playerPos.x,playerPos.y,25,0xffdf58,.2).setStrokeStyle(3,0xffee9b,.9).setDepth(18);
+      this.tweens.add({targets:halo,scale:1.16,alpha:.06,duration:650,yoyo:true,repeat:-1});
+      this.refs.treasureHalo=halo;
+      this.refs.miner=this.add.image(playerPos.x,playerPos.y-3,'minerTex').setScale(.65).setDepth(22);
+      this.add.text(playerPos.x,playerPos.y+28,'BẠN',{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#fff4b2',stroke:'#5a3b20',strokeThickness:3}).setOrigin(.5).setDepth(23);
+
+      const active=routeDefs.find(x=>x.id===state.activePath);
+      const blockedCount=(state.paths||[]).filter(p=>p.blocked).length;
+      this.add.rectangle(222,447,690,38,0x172c3d,.88).setOrigin(0).setStrokeStyle(2,0xffffff,.1);
+      this.add.text(567,466,
+        active?'Đang đi '+active.name+' • Hãy bấm dấu ? tiếp theo.':'Hãy chọn dấu ? đầu tiên của một con đường. Đường bị chặn: '+blockedCount+'/3',
+        {fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#f6fbff'}).setOrigin(.5);
     }
     triggerTreasureMove(target){
       if(this.refs.treasureBusy)return;
@@ -281,61 +291,90 @@
       if(this.refs.onTreasureMove)this.refs.onTreasureMove(target);
     }
     drawTreasureRock(x,y,size=22){
-      const g=this.add.graphics().setDepth(6);
-      g.fillStyle(0x7e878f,1);g.fillCircle(x,y,size);
-      g.fillStyle(0xaeb6bd,1);g.fillCircle(x-size*.32,y-size*.28,size*.34);g.fillCircle(x+size*.26,y+size*.12,size*.25);
-      g.lineStyle(2,0x666e75,.9);g.strokeCircle(x,y,size);
+      const g=this.add.graphics().setDepth(10);
+      g.fillStyle(0x666f77,1);g.fillCircle(x,y,size);
+      g.fillStyle(0x9ca5ac,1);g.fillCircle(x-size*.32,y-size*.28,size*.34);g.fillCircle(x+size*.26,y+size*.12,size*.25);
+      g.lineStyle(2,0x4b5359,.95);g.strokeCircle(x,y,size);
+      g.fillStyle(0x55462f,1);g.fillRect(x-size*.78,y+size*.7,size*1.55,5);
       return g;
     }
     drawTreasureChest(x,y,open=false){
-      const g=this.add.graphics().setDepth(7);
-      g.fillStyle(0x8b3f1f,1);g.fillRoundedRect(x-22,y-4,44,28,5);g.fillStyle(0xd9a32d,1);g.fillRect(x-3,y-4,6,28);g.fillRect(x-22,y+8,44,5);
-      if(open){g.fillStyle(0x5a2a16,1);g.fillRoundedRect(x-22,y-22,44,15,6);g.fillStyle(0xffd84b,1);for(let i=0;i<7;i++)g.fillCircle(x-16+i*5,y-7-(i%2)*4,4);}
-      else{g.fillStyle(0x9c4b26,1);g.fillRoundedRect(x-22,y-19,44,18,7);g.lineStyle(2,0xd9a32d,1);g.strokeRoundedRect(x-22,y-19,44,18,7);}
-      this.add.text(x,y+34,'KHO BÁU',{fontFamily:'Arial',fontSize:'10px',fontStyle:'bold',color:'#ffe9a1',stroke:'#5a351a',strokeThickness:3}).setOrigin(.5).setDepth(8);
+      const g=this.add.graphics().setDepth(11);
+      g.fillStyle(0x7f3719,1);g.fillRoundedRect(x-26,y-3,52,32,6);
+      g.fillStyle(0xe0a82f,1);g.fillRect(x-4,y-3,8,32);g.fillRect(x-26,y+10,52,6);
+      if(open){
+        g.fillStyle(0x522312,1);g.fillRoundedRect(x-26,y-25,52,17,7);
+        g.fillStyle(0xffd84b,1);for(let i=0;i<9;i++)g.fillCircle(x-20+i*5,y-8-(i%2)*4,4);
+      }else{
+        g.fillStyle(0x98451f,1);g.fillRoundedRect(x-26,y-23,52,20,8);g.lineStyle(2,0xe0a82f,1);g.strokeRoundedRect(x-26,y-23,52,20,8);
+      }
+      this.add.text(x,y+40,'KHO BÁU',{fontFamily:'Arial',fontSize:'10px',fontStyle:'bold',color:'#5b3519'}).setOrigin(.5).setDepth(12);
       return g;
     }
-    updateTreasureTimer(sec){if(this.refs.treasureTimer){this.refs.treasureTimer.setText(this.formatSoccerTime(sec));this.refs.treasureTimer.setColor(sec<=60?'#ff9399':'#ffd844');}}
-    updateTreasureScore(correct){if(this.refs.treasureScore)this.refs.treasureScore.setText(`${Math.min(10,correct||0)}/10`);}
-    treasureMoveOpen(target){
-      return new Promise(resolve=>{
-        const miner=this.refs.miner;if(!miner){resolve();return;}
-        const p=this.refs.treasureCellCenter(target.c,target.r);
-        this.tweens.killTweensOf(miner);
-        this.tweens.add({targets:miner,x:p.x,y:p.y-3,duration:360,ease:'Sine.inOut',onComplete:resolve});
-      });
+    updateTreasureTimer(sec){
+      if(this.refs.treasureTimer){
+        this.refs.treasureTimer.setText(this.formatSoccerTime(sec));
+        this.refs.treasureTimer.setColor(sec<=60?'#ff9399':'#8ee9ff');
+      }
+    }
+    updateTreasureScore(points){
+      if(this.refs.treasureScore)this.refs.treasureScore.setText(String(Math.min(70,points||0))+'/70');
     }
     treasureApproach(target){
       return new Promise(resolve=>{
-        const miner=this.refs.miner;if(!miner){resolve();return;}
-        const p=this.refs.treasureCellCenter(target.c,target.r);
+        const miner=this.refs.miner;
+        if(!miner){resolve();return;}
+        const p=this.refs.treasureNodeCenter(target.pathId,target.step);
         this.tweens.killTweensOf(miner);
         if(this.refs.treasureHalo)this.refs.treasureHalo.setVisible(false);
-        this.tweens.add({targets:miner,x:p.x,y:p.y-3,duration:430,ease:'Sine.inOut',onComplete:()=>{this.popMessage('GẶP Ô ? — TRẢ LỜI ĐỂ ĐÀO TIẾP','#fff5d7',C.amber);this.time.delayedCall(260,resolve);}});
+        this.tweens.add({
+          targets:miner,x:p.x,y:p.y-3,duration:520,ease:'Sine.inOut',
+          onComplete:()=>{
+            this.popMessage('CHẶNG '+String(target.step+1)+'/5 — TRẢ LỜI ĐỂ MỞ ĐƯỜNG','#fff5d7',C.amber);
+            this.time.delayedCall(220,resolve);
+          }
+        });
       });
     }
-    treasureOutcome(ok,target){
+    treasureOutcome(ok,target,meta={}){
       return new Promise(resolve=>{
-        const miner=this.refs.miner;if(!miner){resolve();return;}
-        const p=this.refs.treasureCellCenter(target.c,target.r), home=this.refs.treasureHome||{x:miner.x,y:miner.y};
+        const miner=this.refs.miner;
+        if(!miner){resolve();return;}
+        const p=this.refs.treasureNodeCenter(target.pathId,target.step);
+        const home=this.refs.treasureStart||{x:miner.x,y:miner.y};
         if(ok){
-          for(let i=0;i<12;i++){const s=this.add.image(p.x,p.y,'spark').setScale(.3+Math.random()*.2).setTint(i%2?0xffd43b:0x65e6ff).setDepth(35);this.tweens.add({targets:s,x:p.x-35+Math.random()*70,y:p.y-45+Math.random()*80,alpha:0,angle:180+Math.random()*240,duration:550+Math.random()*300,onComplete:()=>s.destroy()});}
-          this.popMessage('ĐÚNG! +10 ĐIỂM — ĐƯỜNG ĐÃ MỞ','#ddffea',C.green);
-          this.time.delayedCall(620,resolve);
+          for(let i=0;i<14;i++){
+            const s=this.add.image(p.x,p.y,'spark').setScale(.3+Math.random()*.22).setTint(i%2?0xffd43b:0x65e6ff).setDepth(35);
+            this.tweens.add({targets:s,x:p.x-38+Math.random()*76,y:p.y-48+Math.random()*88,alpha:0,angle:180+Math.random()*240,duration:560+Math.random()*320,onComplete:()=>s.destroy()});
+          }
+          const msg=(meta.points||0)>0?'ĐÚNG! +10 ĐIỂM — ĐƯỜNG ĐÃ MỞ':'ĐÚNG! ĐƯỜNG ĐÃ MỞ — ĐIỂM ĐÃ ĐẠT TỐI ĐA 70';
+          this.popMessage(msg,'#ddffea',C.green);
+          this.time.delayedCall(680,resolve);
         }else{
-          this.cameras.main.shake(220,.007);
-          const rock=this.drawTreasureRock(p.x,p.y,22).setScale(.1);this.tweens.add({targets:rock,scale:1,duration:260,ease:'Back.out'});
-          this.tweens.add({targets:miner,x:home.x,y:home.y-3,duration:420,ease:'Sine.inOut',onComplete:()=>{this.popMessage('SAI — Ô ? ĐÃ BIẾN THÀNH ĐÁ','#ffe0e0',C.red);this.time.delayedCall(520,resolve);}});
+          this.cameras.main.shake(230,.007);
+          const rock=this.drawTreasureRock(p.x,p.y,21).setScale(.1);
+          this.tweens.add({targets:rock,scale:1,duration:280,ease:'Back.out'});
+          this.tweens.add({
+            targets:miner,x:home.x,y:home.y-3,duration:620,ease:'Sine.inOut',
+            onComplete:()=>{
+              this.popMessage('SAI — ĐƯỜNG NÀY ĐÃ BỊ CHẶN! HÃY CHỌN ĐƯỜNG KHÁC','#ffe0e0',C.red);
+              this.time.delayedCall(650,resolve);
+            }
+          });
         }
       });
     }
-    treasureWin(){
+    treasureWin(meta={}){
       return new Promise(resolve=>{
-        const goal=this.refs.treasureGoal,p=this.refs.treasureCellCenter(goal.c,goal.r),miner=this.refs.miner;
-        if(miner)this.tweens.add({targets:miner,x:p.x,y:p.y-3,duration:420,ease:'Sine.inOut'});
-        for(let i=0;i<34;i++){const s=this.add.image(p.x,p.y,'spark').setTint([0xffd43b,0x65e6ff,0xff8dac,0xffffff][i%4]).setScale(.3+Math.random()*.3).setDepth(40);this.tweens.add({targets:s,x:p.x-120+Math.random()*240,y:p.y-120+Math.random()*170,angle:360+Math.random()*360,alpha:0,duration:800+Math.random()*700,onComplete:()=>s.destroy()});}
-        this.popMessage('🏆 ĐÃ TÌM THẤY KHO BÁU!','#fff5bd',C.yellow);
-        this.time.delayedCall(1200,resolve);
+        const p=this.refs.treasureChest||{x:824,y:254},miner=this.refs.miner;
+        if(miner)this.tweens.add({targets:miner,x:p.x-16,y:p.y-3,duration:650,ease:'Sine.inOut'});
+        this.time.delayedCall(480,()=>this.drawTreasureChest(p.x,p.y,true));
+        for(let i=0;i<42;i++){
+          const s=this.add.image(p.x,p.y,'spark').setTint([0xffd43b,0x65e6ff,0xff8dac,0xffffff][i%4]).setScale(.3+Math.random()*.34).setDepth(40);
+          this.tweens.add({targets:s,x:p.x-145+Math.random()*290,y:p.y-135+Math.random()*190,angle:360+Math.random()*360,alpha:0,duration:850+Math.random()*750,onComplete:()=>s.destroy()});
+        }
+        this.popMessage('🏆 MỞ KHO BÁU — THƯỞNG ĐIỂM CHO ĐỦ 100!','#fff5bd',C.yellow);
+        this.time.delayedCall(1400,resolve);
       });
     }
     createPlayer(x,y,shirt=0x2c70d6,scale=1){
