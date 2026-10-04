@@ -18,7 +18,7 @@
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const labelStyle=(size=24,color='#ffffff',weight='700')=>({
-    fontFamily:'Arial, sans-serif', fontSize:`${size}px`, fontStyle:weight==='700'?'bold':'normal',
+    fontFamily:'Times New Roman, Times, serif', fontSize:`${size}px`, fontStyle:weight==='700'?'bold':'normal',
     color, stroke:'#06131d', strokeThickness:size>=28?5:3, align:'center'
   });
 
@@ -109,7 +109,7 @@
       this.add.rectangle(24,20,420,66,0x061724,.78).setOrigin(0).setStrokeStyle(2,0xffffff,.12);
       this.add.rectangle(24,20,8,66,accent,1).setOrigin(0);
       this.add.text(50,31,title,{...labelStyle(25,'#ffffff'),strokeThickness:3}).setOrigin(0,0);
-      this.add.text(50,61,subtitle,{fontFamily:'Arial',fontSize:'15px',color:'#c8dfed'}).setOrigin(0,0);
+      this.add.text(50,61,subtitle,{fontFamily:'Times New Roman, Times, serif',fontSize:'15px',color:'#c8dfed'}).setOrigin(0,0);
     }
     makeButton(x,y,label,dir,blocked,selected){
       const fill=blocked?0x5d6670:(selected?C.yellow:0x0d3854), txt=blocked?'×':label;
@@ -182,23 +182,23 @@
       }
 
       this.add.rectangle(18,78,188,310,0x162b3a,.96).setOrigin(0).setStrokeStyle(3,0xe9c878,.9);
-      this.add.text(112,94,'⛏️ THỢ SĂN KHO BÁU',{fontFamily:'Arial',fontSize:'16px',fontStyle:'bold',color:'#fff5cc'}).setOrigin(.5);
+      this.add.text(112,94,'⛏️ THỢ SĂN KHO BÁU',{fontFamily:'Times New Roman, Times, serif',fontSize:'16px',fontStyle:'bold',color:'#fff5cc'}).setOrigin(.5);
       this.add.circle(62,140,28,0xeaf6ff,1).setStrokeStyle(3,0xffffff,.75);
       this.add.image(62,143,'minerTex').setScale(.43);
       const pname=String(o.playerName||'Thí sinh');
-      this.add.text(103,128,pname.length>14?pname.slice(0,13)+'…':pname,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#ffffff'});
-      this.add.text(103,148,o.className?'Lớp '+o.className:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'11px',color:'#cce5f2'});
+      this.add.text(103,128,pname.length>14?pname.slice(0,13)+'…':pname,{fontFamily:'Times New Roman, Times, serif',fontSize:'13px',fontStyle:'bold',color:'#ffffff'});
+      this.add.text(103,148,o.className?'Lớp '+o.className:'OLYMPIC HÓA HỌC',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',color:'#cce5f2'});
 
-      this.add.text(34,184,'ĐIỂM CÂU HỎI',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#d9edf8'});
+      this.add.text(34,184,'ĐIỂM CÂU HỎI',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',fontStyle:'bold',color:'#d9edf8'});
       this.refs.treasureScore=this.add.text(112,213,String(Math.min(70,state.gameScore||0))+'/70',{...labelStyle(28,'#ffd84b'),strokeThickness:2}).setOrigin(.5);
-      this.add.text(34,240,'⏱ THỜI GIAN',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#d9edf8'});
+      this.add.text(34,240,'⏱ THỜI GIAN',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',fontStyle:'bold',color:'#d9edf8'});
       this.refs.treasureTimer=this.add.text(112,270,this.formatSoccerTime(o.timeLeft??1200),{...labelStyle(25,'#8ee9ff'),strokeThickness:2}).setOrigin(.5);
-      this.add.text(34,300,'LUẬT CHƠI',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#ffd991'});
-      this.add.text(34,322,'• 3 đường • 5 chặng/đường\n• Đúng mở đường, sai bị chặn\n• Điểm câu hỏi tối đa 70\n• Tới kho báu = đủ 100 điểm',{fontFamily:'Arial',fontSize:'11px',color:'#edf8ff',lineSpacing:4});
+      this.add.text(34,300,'LUẬT CHƠI',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',fontStyle:'bold',color:'#ffd991'});
+      this.add.text(34,322,'• 3 đường • 5 chặng/đường\n• Đúng mở đường, sai bị chặn\n• Điểm câu hỏi tối đa 70\n• Tới kho báu = đủ 100 điểm',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',color:'#edf8ff',lineSpacing:4});
 
       this.add.rectangle(225,18,660,52,0x172c3d,.96).setOrigin(0).setStrokeStyle(3,0xf0cc76,.9);
-      this.add.text(555,30,'🏴‍☠️ BẢN ĐỒ ĐÀO KHO BÁU',{fontFamily:'Arial',fontSize:'24px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5,0);
-      this.add.text(555,57,'Chọn 1 trong 3 con đường • vượt 5 dấu ? để tới rương',{fontFamily:'Arial',fontSize:'12px',color:'#d8ecf7'}).setOrigin(.5,0);
+      this.add.text(555,30,'🏴‍☠️ BẢN ĐỒ ĐÀO KHO BÁU',{fontFamily:'Times New Roman, Times, serif',fontSize:'24px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5,0);
+      this.add.text(555,57,'Chọn 1 trong 3 con đường • vượt 5 dấu ? để tới rương',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',color:'#d8ecf7'}).setOrigin(.5,0);
 
       this.add.rectangle(222,84,690,348,0xd8b978,1).setOrigin(0).setStrokeStyle(5,0x6d4927,1);
       this.add.rectangle(232,94,670,328,0xe7ca91,1).setOrigin(0).setStrokeStyle(2,0xb28b50,.85);
@@ -221,12 +221,12 @@
           mapG.lineStyle(8,dim?0x7c7469:def.color,dim?.25:.84);
           mapG.lineBetween(pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y);
         }
-        this.add.text(263,def.ys[0]-28,def.icon+' '+def.name,{fontFamily:'Arial',fontSize:'10px',fontStyle:'bold',color:'#4a341f'}).setOrigin(0,.5);
+        this.add.text(263,def.ys[0]-28,def.icon+' '+def.name,{fontFamily:'Times New Roman, Times, serif',fontSize:'10px',fontStyle:'bold',color:'#4a341f'}).setOrigin(0,.5);
       });
 
       mapG.fillStyle(0xb35f33,1);mapG.fillTriangle(start.x-18,start.y+18,start.x,start.y-20,start.x+18,start.y+18);
       mapG.fillStyle(0xf2d7a5,1);mapG.fillTriangle(start.x-11,start.y+18,start.x,start.y-10,start.x+11,start.y+18);
-      this.add.text(start.x,start.y+30,'XUẤT PHÁT',{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#5c3d21'}).setOrigin(.5);
+      this.add.text(start.x,start.y+30,'XUẤT PHÁT',{fontFamily:'Times New Roman, Times, serif',fontSize:'9px',fontStyle:'bold',color:'#5c3d21'}).setOrigin(.5);
 
       this.drawTreasureChest(chest.x,chest.y,state.finished===true);
 
@@ -243,20 +243,20 @@
 
           if(isBlocked){
             this.drawTreasureRock(p.x,p.y,20);
-            this.add.text(p.x,p.y+28,'BỊ CHẶN',{fontFamily:'Arial',fontSize:'8px',fontStyle:'bold',color:'#7b2828'}).setOrigin(.5);
+            this.add.text(p.x,p.y+28,'BỊ CHẶN',{fontFamily:'Times New Roman, Times, serif',fontSize:'8px',fontStyle:'bold',color:'#7b2828'}).setOrigin(.5);
             continue;
           }
           if(isDone){
             this.add.circle(p.x,p.y,20,0x2f9a62,1).setStrokeStyle(3,0xe9ffe6,.9).setDepth(8);
-            this.add.text(p.x,p.y-1,'✓',{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
+            this.add.text(p.x,p.y-1,'✓',{fontFamily:'Times New Roman, Times, serif',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
             continue;
           }
 
           const fill=clickable?0xb32f2b:0x8a6a46;
           const alpha=clickable?1:.64;
           const ring=this.add.circle(p.x,p.y,20,fill,alpha).setStrokeStyle(3,clickable?0xffdf70:0xd7bd8f,.95).setDepth(8);
-          const qm=this.add.text(p.x,p.y-1,'?',{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
-          this.add.text(p.x,p.y+28,String(step+1),{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#5a3e23'}).setOrigin(.5);
+          const qm=this.add.text(p.x,p.y-1,'?',{fontFamily:'Times New Roman, Times, serif',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(9);
+          this.add.text(p.x,p.y+28,String(step+1),{fontFamily:'Times New Roman, Times, serif',fontSize:'9px',fontStyle:'bold',color:'#5a3e23'}).setOrigin(.5);
           if(clickable){
             this.tweens.add({targets:ring,scale:1.15,alpha:.72,duration:620,yoyo:true,repeat:-1});
             ring.setInteractive({useHandCursor:true});
@@ -276,14 +276,14 @@
       this.tweens.add({targets:halo,scale:1.16,alpha:.06,duration:650,yoyo:true,repeat:-1});
       this.refs.treasureHalo=halo;
       this.refs.miner=this.add.image(playerPos.x,playerPos.y-3,'minerTex').setScale(.65).setDepth(22);
-      this.add.text(playerPos.x,playerPos.y+28,'BẠN',{fontFamily:'Arial',fontSize:'9px',fontStyle:'bold',color:'#fff4b2',stroke:'#5a3b20',strokeThickness:3}).setOrigin(.5).setDepth(23);
+      this.add.text(playerPos.x,playerPos.y+28,'BẠN',{fontFamily:'Times New Roman, Times, serif',fontSize:'9px',fontStyle:'bold',color:'#fff4b2',stroke:'#5a3b20',strokeThickness:3}).setOrigin(.5).setDepth(23);
 
       const active=routeDefs.find(x=>x.id===state.activePath);
       const blockedCount=(state.paths||[]).filter(p=>p.blocked).length;
       this.add.rectangle(222,447,690,38,0x172c3d,.88).setOrigin(0).setStrokeStyle(2,0xffffff,.1);
       this.add.text(567,466,
         active?'Đang đi '+active.name+' • Hãy bấm dấu ? tiếp theo.':'Hãy chọn dấu ? đầu tiên của một con đường. Đường bị chặn: '+blockedCount+'/3',
-        {fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#f6fbff'}).setOrigin(.5);
+        {fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#f6fbff'}).setOrigin(.5);
     }
     triggerTreasureMove(target){
       if(this.refs.treasureBusy)return;
@@ -308,7 +308,7 @@
       }else{
         g.fillStyle(0x98451f,1);g.fillRoundedRect(x-26,y-23,52,20,8);g.lineStyle(2,0xe0a82f,1);g.strokeRoundedRect(x-26,y-23,52,20,8);
       }
-      this.add.text(x,y+40,'KHO BÁU',{fontFamily:'Arial',fontSize:'10px',fontStyle:'bold',color:'#5b3519'}).setOrigin(.5).setDepth(12);
+      this.add.text(x,y+40,'KHO BÁU',{fontFamily:'Times New Roman, Times, serif',fontSize:'10px',fontStyle:'bold',color:'#5b3519'}).setOrigin(.5).setDepth(12);
       return g;
     }
     updateTreasureTimer(sec){
@@ -452,7 +452,7 @@
       g.strokeCircle(560,463,45);
       // chemistry decorations: flasks and H2O stone
       g.fillStyle(0xf7fbff,.88);g.fillRoundedRect(35,178,52,45,8);g.fillStyle(0x35c4e5,1);g.fillRect(48,198,11,20);g.fillStyle(0xff8d5d,1);g.fillRect(65,193,11,25);
-      g.fillStyle(0x8a8e83,1);g.fillEllipse(893,200,78,34);this.add.text(893,198,'H₂O',{fontFamily:'Arial',fontSize:'18px',fontStyle:'bold',color:'#41515a'}).setOrigin(.5);
+      g.fillStyle(0x8a8e83,1);g.fillEllipse(893,200,78,34);this.add.text(893,198,'H₂O',{fontFamily:'Times New Roman, Times, serif',fontSize:'18px',fontStyle:'bold',color:'#41515a'}).setOrigin(.5);
     }
     showSoccer(o={}){
       this.clearScene();this.mode='soccer';this.drawSoccerChemGarden();
@@ -463,21 +463,21 @@
       this.add.circle(panelX+79,43,27,0xeef7ff,1).setStrokeStyle(3,0xffffff,.8);
       this.add.circle(panelX+79,39,11,0xa8b7c5,1);this.add.ellipse(panelX+79,67,40,25,0xa8b7c5,1);
       const name=String(o.playerName||'Thí sinh');
-      this.add.text(panelX+79,84,name.length>19?name.slice(0,18)+'…':name,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-      this.add.text(panelX+79,105,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'11px',color:'#bfe9ff'}).setOrigin(.5);
+      this.add.text(panelX+79,84,name.length>19?name.slice(0,18)+'…':name,{fontFamily:'Times New Roman, Times, serif',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(panelX+79,105,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',color:'#bfe9ff'}).setOrigin(.5);
 
       this.add.rectangle(panelX,136,panelW,82,0x063d75,.97).setOrigin(0).setStrokeStyle(3,0x68d6ff,.85);
-      this.add.text(panelX+18,150,'⏱  THỜI GIAN',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#e7f8ff'});
+      this.add.text(panelX+18,150,'⏱  THỜI GIAN',{fontFamily:'Times New Roman, Times, serif',fontSize:'13px',fontStyle:'bold',color:'#e7f8ff'});
       this.refs.soccerTimer=this.add.text(panelX+79,190,this.formatSoccerTime(o.timeLeft??120),{...labelStyle(32,'#ffd844'),strokeThickness:2}).setOrigin(.5);
       this.add.rectangle(panelX,226,panelW,82,0x07396a,.97).setOrigin(0).setStrokeStyle(3,0x68d6ff,.85);
-      this.add.text(panelX+18,240,'★  ĐIỂM',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#e7f8ff'});
+      this.add.text(panelX+18,240,'★  ĐIỂM',{fontFamily:'Times New Roman, Times, serif',fontSize:'13px',fontStyle:'bold',color:'#e7f8ff'});
       this.refs.soccerScore=this.add.text(panelX+79,282,String(o.score??0),{...labelStyle(34,'#ffd844'),strokeThickness:2}).setOrigin(.5);
 
       // question board like Violympic
       this.add.rectangle(185,13,760,122,0x9b6a25,1).setOrigin(0).setStrokeStyle(4,0x5b3b12,1);
       this.add.rectangle(192,20,746,108,0xfff8c9,1).setOrigin(0).setStrokeStyle(2,0xd8bc67,1);
-      this.add.text(215,31,`CÂU ${o.question||1}/${o.total||10}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#27854c'});
-      const qRaw=String(o.questionText||'');const qFs=qRaw.length>155?16:qRaw.length>105?19:24;const qText=this.add.text(215,55,qRaw,{fontFamily:'Arial',fontSize:`${qFs}px`,fontStyle:'bold',color:'#1e2730',wordWrap:{width:690,useAdvancedWrap:true},lineSpacing:4});
+      this.add.text(215,31,`CÂU ${o.question||1}/${o.total||10}`,{fontFamily:'Times New Roman, Times, serif',fontSize:'14px',fontStyle:'bold',color:'#27854c'});
+      const qRaw=String(o.questionText||'');const qFs=qRaw.length>155?16:qRaw.length>105?19:24;const qText=this.add.text(215,55,qRaw,{fontFamily:'Times New Roman, Times, serif',fontSize:`${qFs}px`,fontStyle:'bold',color:'#1e2730',wordWrap:{width:690,useAdvancedWrap:true},lineSpacing:4});
       qText.setOrigin(0,0);
 
       // goal and net
@@ -499,9 +499,9 @@
         const [x,y]=positions[i];const c=this.add.container(x,y).setDepth(10);
         const bg=this.add.rectangle(0,0,350,56,0xfff9d7,1).setStrokeStyle(4,0x8b6328,1);
         const badge=this.add.circle(-145,0,22,0x124e9f,1).setStrokeStyle(3,0xffffff,1);
-        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Arial',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Times New Roman, Times, serif',fontSize:'22px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
         const fs=String(txt).length>36?16:String(txt).length>24?18:21;
-        const t=this.add.text(-112,0,String(txt),{fontFamily:'Arial',fontSize:`${fs}px`,fontStyle:'bold',color:'#202832',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
+        const t=this.add.text(-112,0,String(txt),{fontFamily:'Times New Roman, Times, serif',fontSize:`${fs}px`,fontStyle:'bold',color:'#202832',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
         c.add([bg,badge,letter,t]);
         bg.setInteractive({useHandCursor:true});
         bg.on('pointerover',()=>{if(!this.refs.soccerLocked){bg.setFillStyle(0xffef9f,1);c.setScale(1.018)}});
@@ -509,7 +509,7 @@
         bg.on('pointerdown',()=>this.chooseSoccerAnswer(i));
         this.refs.soccerButtons.push({c,bg,badge,letter,t});
       });
-      this.add.text(560,334,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ SÚT',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#eafaff'}).setOrigin(.5).setDepth(9);
+      this.add.text(560,334,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ SÚT',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#eafaff'}).setOrigin(.5).setDepth(9);
     }
     formatSoccerTime(sec){sec=Math.max(0,Math.floor(Number(sec)||0));return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;}
     chooseSoccerAnswer(i){
@@ -524,7 +524,7 @@
     updateSoccerScore(v){if(this.refs.soccerScore)this.refs.soccerScore.setText(String(v));}
     soccerOutcome(ok){
       return new Promise(resolve=>{const ball=this.refs.ball,keeper=this.refs.keeper;if(!ball){resolve();return;}const miss=!ok&&Math.random()<.42;
-        const kick=this.add.text(560,465,'💥',{fontFamily:'Arial',fontSize:'26px'}).setOrigin(.5).setDepth(12).setAlpha(0);this.tweens.add({targets:kick,alpha:1,scale:1.7,duration:120,yoyo:true,onComplete:()=>kick.destroy()});
+        const kick=this.add.text(560,465,'💥',{fontFamily:'Times New Roman, Times, serif',fontSize:'26px'}).setOrigin(.5).setDepth(12).setAlpha(0);this.tweens.add({targets:kick,alpha:1,scale:1.7,duration:120,yoyo:true,onComplete:()=>kick.destroy()});
         if(ok){
           const side=Math.random()<.5?-1:1;this.tweens.add({targets:keeper,x:keeper.x-side*82,y:keeper.y-18,rotation:-side*.48,duration:520,ease:'Cubic.out'});
           this.tweens.add({targets:ball,x:560+side*92,y:222,scale:.42,angle:540,duration:820,ease:'Cubic.in',onComplete:()=>{this.cameras.main.shake(140,.003);this.netPulse();this.soccerResultBanner('VÀOOOO!  +10 ĐIỂM',true);this.spawnSoccerConfetti();this.time.delayedCall(900,resolve);}});
@@ -560,12 +560,36 @@
       const bgfx=this.add.graphics();
       bgfx.fillStyle(0x000000,.07); bgfx.fillRect(0,0,W,500);
 
-      // question board
-      this.add.rectangle(176,14,768,118,0x4b5661,.94).setOrigin(0).setStrokeStyle(4,0xffffff,.38).setDepth(5);
-      this.add.text(196,30,`CÂU ${o.question||1}/${o.total||10}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffe7a7'}).setDepth(6);
-      const qRaw=String(o.questionText||'');
-      const qFs=qRaw.length>150?16:qRaw.length>105?19:23;
-      this.add.text(196,52,qRaw,{fontFamily:'Arial',fontSize:`${qFs}px`,fontStyle:'bold',color:'#ffffff',wordWrap:{width:720,useAdvancedWrap:true},lineSpacing:4}).setDepth(6);
+      // question board — auto-fit long questions so every line stays inside the panel
+      const qRaw=String(o.questionText||'').trim();
+      const boardX=176, boardY=10, boardW=768;
+      const questionX=196, questionY=48, questionW=720;
+      let qFs=qRaw.length>260?13:qRaw.length>190?14:qRaw.length>125?16:19;
+      const qText=this.add.text(questionX,questionY,qRaw,{
+        fontFamily:'Times New Roman, Times, serif',
+        fontSize:String(qFs)+'px',
+        fontStyle:'bold',
+        color:'#ffffff',
+        wordWrap:{width:questionW,useAdvancedWrap:true},
+        lineSpacing:2
+      }).setDepth(6);
+      // Measure the rendered text and shrink only when necessary. This avoids
+      // overflow without cutting the question or changing the game animation.
+      const maxQuestionHeight=118;
+      while(qText.height>maxQuestionHeight && qFs>11){
+        qFs-=1;
+        qText.setFontSize(qFs);
+      }
+      const boardH=Math.max(126,Math.min(174,qText.height+58));
+      this.add.rectangle(boardX,boardY,boardW,boardH,0x4b5661,.94)
+        .setOrigin(0).setStrokeStyle(4,0xffffff,.38).setDepth(5);
+      this.add.text(196,24,'CÂU '+String(o.question||1)+'/'+String(o.total||10),{
+        fontFamily:'Times New Roman, Times, serif',
+        fontSize:'14px',fontStyle:'bold',color:'#ffe7a7'
+      }).setDepth(6);
+      // If the question is extremely long, clip to the visual board rather than
+      // letting it cover the hoop/answers. Normal questions are fully visible.
+      qText.setCrop(0,0,questionW,Math.min(qText.height,maxQuestionHeight));
 
       // left info panel
       const panelX=10,panelW=150;
@@ -574,16 +598,16 @@
       this.add.circle(panelX+43,45,8,0xa8b7c5,1).setDepth(7);
       this.add.ellipse(panelX+43,66,30,18,0xa8b7c5,1).setDepth(7);
       const name=String(o.playerName||'Thí sinh');
-      this.add.text(panelX+78,36,name.length>15?name.slice(0,14)+'…':name,{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
-      this.add.text(panelX+78,56,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Arial',fontSize:'10px',color:'#dfebf7'}).setDepth(7);
-      this.add.text(panelX+78,79,'BÓNG RỔ',{fontFamily:'Arial',fontSize:'11px',fontStyle:'bold',color:'#ffd788'}).setDepth(7);
+      this.add.text(panelX+78,36,name.length>15?name.slice(0,14)+'…':name,{fontFamily:'Times New Roman, Times, serif',fontSize:'13px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
+      this.add.text(panelX+78,56,o.className?`Lớp ${o.className}`:'OLYMPIC HÓA HỌC',{fontFamily:'Times New Roman, Times, serif',fontSize:'10px',color:'#dfebf7'}).setDepth(7);
+      this.add.text(panelX+78,79,'BÓNG RỔ',{fontFamily:'Times New Roman, Times, serif',fontSize:'11px',fontStyle:'bold',color:'#ffd788'}).setDepth(7);
 
       this.add.rectangle(panelX,124,panelW,76,0x31353d,.93).setOrigin(0).setStrokeStyle(3,0xffffff,.18).setDepth(6);
-      this.add.text(panelX+16,138,'ĐIỂM',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
+      this.add.text(panelX+16,138,'ĐIỂM',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
       this.refs.basketScore=this.add.text(panelX+75,166,String(o.score??0),{...labelStyle(28,'#ffd844'),strokeThickness:2}).setOrigin(.5).setDepth(7);
 
       this.add.rectangle(panelX,212,panelW,76,0x31353d,.93).setOrigin(0).setStrokeStyle(3,0xffffff,.18).setDepth(6);
-      this.add.text(panelX+16,226,'THỜI GIAN',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
+      this.add.text(panelX+16,226,'THỜI GIAN',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setDepth(7);
       this.refs.basketTimer=this.add.text(panelX+75,255,this.formatSoccerTime(o.timeLeft??120),{...labelStyle(24,'#ffd844'),strokeThickness:2}).setOrigin(.5).setDepth(7);
 
       // hoop highlight / actor zone using approved composition
@@ -602,7 +626,7 @@
       this.refs.rimTarget={x:480,y:205};
       this.refs.netTarget={x:480,y:228};
 
-      this.add.text(480,414,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ NÉM',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(8);
+      this.add.text(480,414,'CHỌN ĐÁP ÁN ĐỂ THỰC HIỆN CÚ NÉM',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5).setDepth(8);
 
       // answer panels around bottom
       const options=(o.options||[]).slice(0,4);
@@ -613,9 +637,9 @@
         const c=this.add.container(x,y).setDepth(20);
         const bg=this.add.rectangle(0,0,350,52,0xffffff,.96).setStrokeStyle(4,0x9a9a9a,1);
         const badge=this.add.circle(-145,0,20,0xf28b25,1).setStrokeStyle(3,0xffffff,1);
-        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Arial',fontSize:'21px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+        const letter=this.add.text(-145,0,'ABCD'[i],{fontFamily:'Times New Roman, Times, serif',fontSize:'21px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
         const fs=String(txt).length>34?15:String(txt).length>24?17:20;
-        const t=this.add.text(-112,0,String(txt),{fontFamily:'Arial',fontSize:`${fs}px`,fontStyle:'bold',color:'#252a31',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
+        const t=this.add.text(-112,0,String(txt),{fontFamily:'Times New Roman, Times, serif',fontSize:`${fs}px`,fontStyle:'bold',color:'#252a31',wordWrap:{width:270,useAdvancedWrap:true},lineSpacing:1}).setOrigin(0,.5);
         c.add([bg,badge,letter,t]);
         bg.setInteractive({useHandCursor:true});
         bg.on('pointerover',()=>{if(!this.refs.basketLocked){bg.setFillStyle(0xfff2ce,1);c.setScale(1.02);}});
@@ -645,7 +669,7 @@
         const control=new Phaser.Math.Vector2((start.x+rim.x)/2,82);
         const curve=new Phaser.Curves.QuadraticBezier(start,control,end);
         const state={t:0};
-        const whoosh=this.add.text(start.x,start.y-20,'🏀',{fontFamily:'Arial',fontSize:'22px'}).setDepth(22).setAlpha(0);
+        const whoosh=this.add.text(start.x,start.y-20,'🏀',{fontFamily:'Times New Roman, Times, serif',fontSize:'22px'}).setDepth(22).setAlpha(0);
         this.tweens.add({targets:whoosh,alpha:1,scale:1.35,duration:120,yoyo:true,onComplete:()=>whoosh.destroy()});
         this.tweens.add({targets:state,t:1,duration:900,ease:'Sine.inOut',onUpdate:()=>{ const p=curve.getPoint(state.t); ball.setPosition(p.x,p.y); ball.angle+=18; ball.setScale(.66-(state.t*.18)); },onComplete:()=>{
           if(ok){
@@ -684,11 +708,11 @@
       const stagePct=((question-1)/Math.max(1,total))*100;
       this.add.rectangle(720,34,190,28,0x061724,.86).setOrigin(0).setStrokeStyle(1,0xffffff,.16);
       this.add.rectangle(727,41,176*stagePct/100,14,C.cyan,1).setOrigin(0);
-      this.add.text(815,48,`CHẶNG ${question}/${total}`,{fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-      this.add.text(815,74,'ĐÍCH SAU 2 CHƯỚNG NGẠI',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#c8dce9'}).setOrigin(.5);
+      this.add.text(815,48,`CHẶNG ${question}/${total}`,{fontFamily:'Times New Roman, Times, serif',fontSize:'14px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(815,74,'ĐÍCH SAU 2 CHƯỚNG NGẠI',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#c8dce9'}).setOrigin(.5);
       const card=this.add.rectangle(118,52,172,72,0x082436,.82).setStrokeStyle(2,0xffffff,.12); card.setOrigin(0,0);
-      this.add.text(204,76,o.playerName||'Người chơi',{fontFamily:'Arial',fontSize:'18px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
-      this.add.text(204,101,o.className||'Mini game 3/3',{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#b7d3e4'}).setOrigin(.5);
+      this.add.text(204,76,o.playerName||'Người chơi',{fontFamily:'Times New Roman, Times, serif',fontSize:'18px',fontStyle:'bold',color:'#ffffff'}).setOrigin(.5);
+      this.add.text(204,101,o.className||'Mini game 3/3',{fontFamily:'Times New Roman, Times, serif',fontSize:'12px',fontStyle:'bold',color:'#b7d3e4'}).setOrigin(.5);
       const roadY=404;
       const obstacleX=690;
       const stopX=300;
@@ -701,7 +725,7 @@
       this.refs.raceCar.x = o.stopped?stopX:startX;
       this.add.text(obstacleX,roadY-84, obstacle==='rock'?'HÒN ĐÁ':(obstacle==='puddle'?'VŨNG NƯỚC':'BỤI CÂY'), {...labelStyle(16,'#ffffff'),strokeThickness:2}).setOrigin(.5);
       this.add.rectangle(W/2,H-28,760,30,0x082436,.84).setStrokeStyle(1,0xffffff,.14);
-      this.add.text(W/2,H-28,o.stopped?'Xe đã dừng lại. Hãy trả lời câu hỏi để vượt chướng ngại vật.':'Xe đang chạy tới chướng ngại vật...', {fontFamily:'Arial',fontSize:'14px',fontStyle:'bold',color:'#eaf7ff'}).setOrigin(.5);
+      this.add.text(W/2,H-28,o.stopped?'Xe đã dừng lại. Hãy trả lời câu hỏi để vượt chướng ngại vật.':'Xe đang chạy tới chướng ngại vật...', {fontFamily:'Times New Roman, Times, serif',fontSize:'14px',fontStyle:'bold',color:'#eaf7ff'}).setOrigin(.5);
     }
     drawRaceLandscape(){
       const g=this.add.graphics();
