@@ -581,7 +581,7 @@ def admin_pdf_import(rid):
                     rid,item["game"],item["qtype"],item["content"],
                     json.dumps(item["options"],ensure_ascii=False),
                     json.dumps(item["correct"],ensure_ascii=False),
-                    item["points"],item.get("explanation",""),None,
+                    item["points"],item.get("explanation",""),item.get("image_data"),
                 )
             )
         con.commit()
@@ -592,10 +592,16 @@ def admin_pdf_import(rid):
             "basketball":"Ném bóng",
             "racing":"Lái xe vượt chướng ngại vật",
         }.get(game,game)
+        image_count=int(result.get("image_count") or 0)
         msg=f"Đã đọc PDF và nhập {len(questions)} câu cho {game_name}."
+        if image_count:
+            msg+=f" Giữ lại hình ảnh cho {image_count} câu."
         if replace_existing:
             msg+=" Bộ câu hỏi cũ của mini game này đã được thay thế."
         flash(msg,"success")
+
+        for warning in (result.get("image_warnings") or [])[:3]:
+            flash(warning,"danger")
 
         skipped=result.get("skipped") or []
         if skipped:
