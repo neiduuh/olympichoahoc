@@ -253,6 +253,8 @@ def play(round_id):
             con.execute("UPDATE rounds SET selected_sport=? WHERE id=?", (selected_sport, round_id))
 
         random.shuffle(grouped["bee"])
+        # Ba con đường x 5 chặng = tối đa 15 câu cho mini game Đào kho báu.
+        grouped["bee"]=grouped["bee"][:min(15,len(grouped["bee"]))]
         if selected_sport:
             random.shuffle(grouped[selected_sport])
             grouped[selected_sport]=grouped[selected_sport][:min(10, len(grouped[selected_sport]))]
@@ -324,7 +326,9 @@ def api_answer():
                 WHERE aa.attempt_id=? AND qq.game_type='bee'
             """,(aid,)).fetchone()
             prev_treasure=int(prev_row["s"] or 0)
-            score=min(10,max(0,100-prev_treasure)) if ok else 0
+            # V5.6: điểm từ câu hỏi Đào kho báu tối đa 70. Khi chạm kho báu,
+            # endpoint /api/treasure-complete sẽ cộng thưởng cho đủ 100 điểm.
+            score=min(10,max(0,70-prev_treasure)) if ok else 0
         else:
             score=int(row["points"] or 0) if ok else 0
     elif row["qtype"]=="mcq":
@@ -342,6 +346,57 @@ def api_answer():
     total=con.execute("UPDATE attempts SET server_score=server_score+? WHERE id=? AND user_id=? RETURNING server_score",(score,aid,uid)).fetchone()["server_score"]
     con.commit(); con.close()
     return jsonify({"ok":ok,"score":score,"total_score":total,"duplicate":False,"explanation":row["explanation"] or ""})
+
+@app.route("/api/treasure-complete", methods=["POST"])
+def api_treasure_complete():
+    """Award the chest bonus so the treasure mini game finishes at exactly 100 points.
+
+    Đào kho báu luôn là mini game đầu tiên. The update is idempotent: calling this
+    endpoint twice never adds the bonus twice.
+    """
+    uid=_session_uid_required()
+    data=request.get_json(force=True)
+    aid=int(data["attempt_id"])
+    con=db()
+    try:
+        row=con.execute("""
+            SELECT a.server_score,a.finished_at,
+                   COUNT(*) FILTER (WHERE q.game_type='bee' AND aa.is_correct=1) AS correct_bee,
+                   COALESCE(SUM(CASE WHEN q.game_type='bee' THEN aa.score ELSE 0 END),0) AS bee_score,
+                   COUNT(*) FILTER (WHERE q.game_type<>'bee') AS other_answers
+            FROM attempts a
+            LEFT JOIN attempt_answers aa ON aa.attempt_id=a.id
+            LEFT JOIN questions q ON q.id=aa.question_id
+            WHERE a.id=? AND a.user_id=?
+            GROUP BY a.id,a.server_score,a.finished_at
+        """,(aid,uid)).fetchone()
+        if not row or row["finished_at"]:
+            abort(403)
+        if int(row["other_answers"] or 0)>0:
+            # Chest bonus is only valid before the next mini game starts.
+            abort(403)
+        if int(row["correct_bee"] or 0)<5:
+            # One complete route contains five checkpoints.
+            abort(403)
+
+        bee_score=min(70,int(row["bee_score"] or 0))
+        bonus=max(0,100-bee_score)
+        current=int(row["server_score"] or 0)
+        if current<100:
+            total=con.execute(
+                "UPDATE attempts SET server_score=100 WHERE id=? AND user_id=? AND finished_at IS NULL RETURNING server_score",
+                (aid,uid)
+            ).fetchone()["server_score"]
+            con.commit()
+        else:
+            total=current
+        return jsonify({"ok":True,"question_score":bee_score,"bonus":bonus,"total_score":int(total)})
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
 
 @app.route("/api/finish", methods=["POST"])
 def api_finish():
@@ -540,7 +595,7 @@ def admin_pdf_import(rid):
             more=f" (+{len(skipped)-4} lỗi khác)" if len(skipped)>4 else ""
             flash(f"Có {len(skipped)} câu chưa nhập được: {preview}{more}","danger")
 
-        minimum={"bee":10,"soccer":10,"basketball":10,"racing":2}.get(game,1)
+        minimum={"bee":15,"soccer":10,"basketball":10,"racing":2}.get(game,1)
         if len(questions)<minimum:
             flash(
                 f"Khuyến nghị mini game này có ít nhất {minimum} câu; hiện PDF chỉ đọc được {len(questions)} câu.",
