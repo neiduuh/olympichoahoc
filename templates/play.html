@@ -53,13 +53,25 @@ const games=[
 
 let gi=0, qi=0, score=0, violations=0, started=Date.now(), detail=[];
 let questionDeadline=null, timerHandle=null, locked=false;
-const TREASURE_COLS=8, TREASURE_ROWS=7;
+const TREASURE_ROUTE_LENGTH=5;
+const TREASURE_ROUTE_META=[
+  {id:'mountain',name:'Đường Núi Đá',icon:'⛰️'},
+  {id:'cave',name:'Đường Hang Bí Mật',icon:'🕯️'},
+  {id:'forest',name:'Đường Rừng Cổ',icon:'🌿'}
+];
 const treasure={
-  position:{c:0,r:6}, goal:{c:6,r:2},
-  opened:new Set(['0,6']),
-  rocks:new Set(['2,6','1,4','3,5','4,3','5,4','0,3','6,5','2,2','7,2','7,4','3,1','5,1']),
-  initialRocks:new Set(['2,6','1,4','3,5','4,3','5,4','0,3','6,5','2,2','7,2','7,4','3,1','5,1']),
-  correct:0, gameScore:0, failedRockCount:0, pending:null, startedAt:null, ended:false, busy:false
+  paths:TREASURE_ROUTE_META.map(x=>({...x,step:0,blocked:false,blockedAt:null})),
+  activePath:null,
+  position:{pathId:null,step:-1},
+  correct:0,
+  answered:0,
+  gameScore:0,
+  failedRockCount:0,
+  pending:null,
+  startedAt:null,
+  ended:false,
+  finishing:false,
+  busy:false
 };
 let raceProgress=0;
 const raceState={
@@ -132,12 +144,12 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 
-function gameTargetUnits(g){return g==='bee'?10:(grouped[g]||[]).length}
+function gameTargetUnits(g){return g==='bee'?15:(grouped[g]||[]).length}
 function totalQuestions(){return games.reduce((s,x)=>s+gameTargetUnits(x[0]),0)}
 function doneQuestions(){
   let d=0;
   for(let i=0;i<gi;i++)d+=gameTargetUnits(games[i][0]);
-  if(gi<games.length){const g=games[gi][0];d+=g==='bee'?Math.min(10,treasure.correct):qi;}
+  if(gi<games.length){const g=games[gi][0];d+=g==='bee'?Math.min(15,treasure.answered):qi;}
   return d;
 }
 function setProgress(){
@@ -289,30 +301,22 @@ function buildRacingQuestionCard(q,n){
   };
 }
 
-function treasureKey(c,r){return `${c},${r}`}
-function treasureHasPath(){
-  const start=treasure.position, goal=treasure.goal, rocks=treasure.rocks;
-  const q=[start], seen=new Set([treasureKey(start.c,start.r)]);
-  for(let head=0;head<q.length;head++){
-    const p=q[head]; if(p.c===goal.c&&p.r===goal.r)return true;
-    for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){
-      const c=p.c+dc,r=p.r+dr,k=treasureKey(c,r);
-      if(c<0||c>=TREASURE_COLS||r<0||r>=TREASURE_ROWS||rocks.has(k)||seen.has(k))continue;
-      seen.add(k);q.push({c,r});
-    }
-  }
-  return false;
-}
+function treasureRoute(id){return treasure.paths.find(p=>p.id===id)||null}
+function treasureHasPath(){return treasure.paths.some(p=>!p.blocked && p.step<TREASURE_ROUTE_LENGTH)}
 function treasureRemaining(){
   if(treasure.startedAt===null)treasure.startedAt=Date.now();
   return Math.max(0,1200-Math.floor((Date.now()-treasure.startedAt)/1000));
 }
 function treasureStateForGame(){
   return {
-    position:{...treasure.position},goal:{...treasure.goal},
-    opened:[...treasure.opened],rocks:[...treasure.rocks],
-    correct:treasure.correct,gameScore:treasure.gameScore,
-    failedRockCount:treasure.failedRockCount,finished:treasure.ended
+    paths:treasure.paths.map(p=>({...p})),
+    activePath:treasure.activePath,
+    position:{...treasure.position},
+    correct:treasure.correct,
+    answered:treasure.answered,
+    gameScore:treasure.gameScore,
+    failedRockCount:treasure.failedRockCount,
+    finished:treasure.ended
   };
 }
 function renderTreasure(arr){
@@ -320,53 +324,133 @@ function renderTreasure(arr){
   if(treasure.startedAt===null)treasure.startedAt=Date.now();
   const remaining=treasureRemaining();
   if(remaining<=0){endTreasure(false,'Hết 20 phút — chưa tìm được kho báu.');return;}
+  if(!arr.length){endTreasure(false,'Mini game chưa có câu hỏi. Admin cần nhập bộ câu hỏi Đào kho báu.');return;}
+
   window.ChemGames?.showTreasure({
-    state:treasureStateForGame(),timeLeft:remaining,playerName,className:playerClass,
+    state:treasureStateForGame(),
+    timeLeft:remaining,
+    playerName,
+    className:playerClass,
     onMove:(target)=>handleTreasureMove(target,arr)
   });
-  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>⛏️ Hãy tìm đường tới kho báu.</b><br><span>Bấm ô liền kề hoặc nút mũi tên. Đi vào ô <b>?</b> mới xuất hiện câu hỏi; sai thì ô đó hóa đá.</span><span id="qtime" style="display:none"></span></div>`;
+
+  const active=treasureRoute(treasure.activePath);
+  const routeText=active
+    ? `Đang đi <b>${esc(active.name)}</b> • Chặng ${Math.min(active.step+1,TREASURE_ROUTE_LENGTH)}/${TREASURE_ROUTE_LENGTH}`
+    : 'Chọn một trong <b>3 con đường</b> để bắt đầu.';
+  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite">
+    <b>⛏️ TÌM ĐƯỜNG ĐẾN KHO BÁU</b><br>
+    <span>${routeText}</span><br>
+    <span>Đúng: mở chặng đường và +10 điểm (tối đa 70). Sai: con đường đó bị chặn, phải chọn đường khác. Tới kho báu sẽ được thưởng cho đủ 100 điểm.</span>
+    <span id="qtime" style="display:none"></span>
+  </div>`;
   startQuestionTimer(remaining);
 }
 async function handleTreasureMove(target,arr){
-  if(treasure.busy||treasure.ended||locked)return;
-  treasure.busy=true;
-  const k=target.key||treasureKey(target.c,target.r);
-  if(target.type==='open'){
-    await (window.ChemGames?.treasureMoveOpen(target)||Promise.resolve());
-    treasure.position={c:target.c,r:target.r};
-    treasure.busy=false;renderTreasure(arr);return;
-  }
-  if(target.type==='treasure'){
-    await (window.ChemGames?.treasureWin()||Promise.resolve());
-    treasure.position={c:target.c,r:target.r};
-    await endTreasure(true,'Đã tìm thấy kho báu!');return;
-  }
+  if(treasure.busy||treasure.ended||treasure.finishing||locked)return;
+  const path=treasureRoute(target?.pathId);
+  if(!path||path.blocked)return;
+  if(treasure.activePath && treasure.activePath!==path.id)return;
+  if(target.step!==path.step || target.step>=TREASURE_ROUTE_LENGTH)return;
   if(qi>=arr.length){
-    treasure.busy=false;
-    await endTreasure(false,'Đã hết câu hỏi trong ngân hàng trước khi tới kho báu. Admin nên thêm ít nhất 15–20 câu.');return;
+    await endTreasure(false,'Đã hết câu hỏi trong ngân hàng trước khi tìm được kho báu. Nên có ít nhất 15 câu.');return;
   }
-  treasure.pending={c:target.c,r:target.r,key:k,type:'question'};
-  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite"><b>⛏️ Đang tiến tới ô bí ẩn...</b><br><span>Câu hỏi sẽ xuất hiện khi nhân vật tới ô ?.</span><span id="qtime" style="display:none"></span></div>`;
+
+  treasure.busy=true;
+  treasure.activePath=path.id;
+  treasure.pending={pathId:path.id,step:path.step,key:`${path.id}:${path.step}`,type:'question'};
+  questionRoot.innerHTML=`<div class="soccer-status-strip bee-status-strip" aria-live="polite">
+    <b>⛏️ ${esc(path.name)} — đang tiến tới chặng ${path.step+1}/${TREASURE_ROUTE_LENGTH}...</b><br>
+    <span>Nhân vật sẽ dừng tại dấu ? rồi câu hỏi mới xuất hiện.</span>
+    <span id="qtime" style="display:none"></span>
+  </div>`;
   await (window.ChemGames?.treasureApproach(treasure.pending)||Promise.resolve());
   showTreasureQuestion(arr[qi],arr.length);
 }
 function showTreasureQuestion(q,n){
   treasure.busy=false;
+  const path=treasureRoute(treasure.pending?.pathId);
+  const step=(treasure.pending?.step??0)+1;
   const remaining=treasureRemaining();
-  questionRoot.innerHTML=questionCard(q,`Ô bí ẩn • Câu ngẫu nhiên ${qi+1}`,shortInput(),'<span>Đúng: +10 điểm và ô ? mở đường. Sai: ô ? biến thành đá, phải tìm đường khác.</span>');
-  bindAnswers(q);document.getElementById('ans')?.focus();startQuestionTimer(remaining);
+  questionRoot.innerHTML=questionCard(
+    q,
+    `${path?esc(path.name):'Đường kho báu'} • Chặng ${step}/${TREASURE_ROUTE_LENGTH} • Câu ngẫu nhiên ${Math.min(qi+1,n)}/${n}`,
+    shortInput(),
+    '<span>Đúng: mở đường. Sai: đường hiện tại bị chặn bằng chướng ngại vật và bạn phải quay về chọn đường khác.</span>'
+  );
+  bindAnswers(q);
+  document.getElementById('ans')?.focus();
+  startQuestionTimer(remaining);
+}
+async function awardTreasureBonus(){
+  const res=await fetch('/api/treasure-complete',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({attempt_id:attemptId})
+  });
+  if(!res.ok)throw new Error('Không thể ghi nhận phần thưởng kho báu');
+  return res.json();
 }
 async function endTreasure(success,message){
-  if(treasure.ended)return;
-  treasure.ended=true;clearInterval(timerHandle);locked=true;
+  if(treasure.ended||treasure.finishing)return;
+  clearInterval(timerHandle);
+  locked=true;
+  treasure.finishing=true;
+
+  let bonus=0;
+  let questionScore=treasure.gameScore;
   if(success){
-    treasure.gameScore=Math.min(100,treasure.gameScore);
-    questionRoot.innerHTML=`<section class="pro-finish-card"><div class="finish-medal">🏆</div><div class="finish-kicker">ĐÀO KHO BÁU THÀNH CÔNG</div><h2>${treasure.gameScore}/100 điểm</h2><p>${esc(message)}</p><p>Đang chuyển sang mini game tiếp theo...</p></section>`;
+    try{
+      const d=await awardTreasureBonus();
+      questionScore=Number.isFinite(+d.question_score)?+d.question_score:treasure.gameScore;
+      bonus=Number.isFinite(+d.bonus)?+d.bonus:Math.max(0,100-questionScore);
+      treasure.gameScore=100;
+      score=Number.isFinite(+d.total_score)?+d.total_score:100;
+      scoreEl.textContent=score;
+    }catch(err){
+      treasure.finishing=false;
+      locked=false;
+      questionRoot.innerHTML=`<section class="pro-finish-card">
+        <div class="finish-medal">⚠️</div>
+        <div class="finish-kicker">ĐÃ TÌM THẤY KHO BÁU</div>
+        <h2>Chưa ghi được phần thưởng</h2>
+        <p>Mạng đang chập chờn. Bấm nút dưới để ghi nhận điểm kho báu rồi tiếp tục.</p>
+        <button class="btn" id="retryTreasureBonus" type="button">Ghi nhận kho báu & tiếp tục</button>
+      </section>`;
+      document.getElementById('retryTreasureBonus')?.addEventListener('click',()=>endTreasure(true,message));
+      return;
+    }
+  }
+
+  treasure.ended=true;
+  treasure.finishing=false;
+  if(success){
+    questionRoot.innerHTML=`<section class="pro-finish-card">
+      <div class="finish-medal">🏆</div>
+      <div class="finish-kicker">ĐÀO KHO BÁU THÀNH CÔNG</div>
+      <h2>100/100 điểm</h2>
+      <div class="finish-stats">
+        <div><span>Điểm câu hỏi</span><strong>${questionScore}/70</strong></div>
+        <div><span>Thưởng kho báu</span><strong>+${bonus}</strong></div>
+        <div><span>Đường đã thử</span><strong>${treasure.paths.filter(p=>p.step>0||p.blocked).length}/3</strong></div>
+      </div>
+      <p>${esc(message)}</p><p>Đang chuyển sang mini game tiếp theo...</p>
+    </section>`;
   }else{
-    questionRoot.innerHTML=`<section class="pro-finish-card"><div class="finish-medal">🪨</div><div class="finish-kicker">ĐÀO KHO BÁU THẤT BẠI</div><h2>${treasure.gameScore}/100 điểm</h2><p>${esc(message)}</p><p>Đang chuyển sang mini game tiếp theo...</p></section>`;
+    questionRoot.innerHTML=`<section class="pro-finish-card">
+      <div class="finish-medal">🪨</div>
+      <div class="finish-kicker">ĐÀO KHO BÁU KẾT THÚC</div>
+      <h2>${treasure.gameScore}/100 điểm</h2>
+      <div class="finish-stats">
+        <div><span>Câu đã trả lời</span><strong>${treasure.answered}</strong></div>
+        <div><span>Đường bị chặn</span><strong>${treasure.paths.filter(p=>p.blocked).length}/3</strong></div>
+        <div><span>Điểm câu hỏi</span><strong>${treasure.gameScore}/70</strong></div>
+      </div>
+      <p>${esc(message)}</p><p>Đang chuyển sang mini game tiếp theo...</p>
+    </section>`;
   }
   setProgress();renderPhaseTabs();
-  await new Promise(r=>setTimeout(r,1500));
+  await new Promise(r=>setTimeout(r,2200));
   locked=false;gi++;qi=0;render();
 }
 function renderSoccer(q,n){
@@ -424,23 +508,48 @@ async function submitAns(ans){
 
     if(g==='bee'){
       const target=treasure.pending;
+      const path=treasureRoute(target?.pathId);
+      if(!target||!path)throw new Error('Trạng thái đường đi không hợp lệ');
+
+      treasure.answered++;
       if(d.ok){
-        treasure.opened.add(target.key);
-        treasure.position={c:target.c,r:target.r};
+        path.step=Math.max(path.step,target.step+1);
+        treasure.activePath=path.id;
+        treasure.position={pathId:path.id,step:path.step-1};
         treasure.correct++;
-        treasure.gameScore=Math.min(100,treasure.gameScore+(+d.score||0));
+        treasure.gameScore=Math.min(70,treasure.gameScore+(+d.score||0));
       }else{
-        treasure.rocks.add(target.key);
+        path.blocked=true;
+        path.blockedAt=target.step;
         treasure.failedRockCount++;
+        treasure.activePath=null;
+        treasure.position={pathId:null,step:-1};
       }
-      await (window.ChemGames?.treasureOutcome(d.ok,target)||Promise.resolve());
-      qi++;treasure.pending=null;treasure.busy=false;locked=false;
-      window.ChemGames?.updateTreasureScore(treasure.correct);
+
+      await (window.ChemGames?.treasureOutcome(d.ok,target,{
+        points:+d.score||0,
+        score:treasure.gameScore,
+        capped:treasure.gameScore>=70
+      })||Promise.resolve());
+
+      qi++;
+      treasure.pending=null;
+      treasure.busy=false;
+      locked=false;
+      window.ChemGames?.updateTreasureScore(treasure.gameScore);
+
+      if(d.ok && path.step>=TREASURE_ROUTE_LENGTH){
+        await (window.ChemGames?.treasureWin({pathId:path.id})||Promise.resolve());
+        await endTreasure(true,`Bạn đã vượt qua đủ ${TREASURE_ROUTE_LENGTH} chặng của ${path.name} và mở được rương kho báu!`);
+        return;
+      }
       if(!d.ok && !treasureHasPath()){
-        await endTreasure(false,'Các đường còn lại đã bị đá chặn. Không còn đường tới kho báu.');return;
+        await endTreasure(false,'Cả 3 con đường đều đã bị chướng ngại vật chặn. Không còn đường tới kho báu.');
+        return;
       }
-      if(qi>=grouped.bee.length && !(treasure.position.c===treasure.goal.c&&treasure.position.r===treasure.goal.r)){
-        await endTreasure(false,'Đã hết câu hỏi trong ngân hàng trước khi tới kho báu.');return;
+      if(qi>=grouped.bee.length){
+        await endTreasure(false,'Đã hết câu hỏi trong ngân hàng trước khi tìm được kho báu. Admin nên có ít nhất 15 câu.');
+        return;
       }
       render();return;
     }
